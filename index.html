@@ -303,6 +303,7 @@ nav button.active{border-bottom-width:2px}
 .chart-card.main{grid-column:1/-1}
 .chart-card.main .chart-box{height:420px}
 .chart-big{position:relative;height:min(70vh,640px)}
+.lang-seg button{padding:5px 10px;font-size:12.5px}
 .view-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .view-head .back{border:1px solid var(--line2);background:var(--card);border-radius:10px;padding:6px 12px;cursor:pointer;font-weight:600;color:var(--muted)}
 </style>
@@ -336,6 +337,7 @@ nav button.active{border-bottom-width:2px}
       <div class="chips">
         <span id="chipDevice" class="chip gray"><span class="dot"></span>Бокс: ожидание</span>
         <span id="chipGrow" class="chip">—</span>
+        <div class="seg lang-seg" id="langSeg" data-noi18n><button data-l="ru">RU</button><button data-l="en">EN</button></div>
       </div>
     </div>
     <nav id="nav">
@@ -492,7 +494,18 @@ nav button.active{border-bottom-width:2px}
             <div class="fields">
               <div><label class="f" for="cDoorMin">Предупреждение о двери, мин</label><input type="number" id="cDoorMin" min="1" max="120"></div>
               <div><label class="f" for="cTz">Часовой пояс</label><select id="cTz"></select></div>
+              <div><label class="f" for="cDispLang">Язык дисплея бокса</label><select id="cDispLang"><option value="ru">Русский</option><option value="en">English</option></select></div>
             </div>
+            <div class="sep"></div>
+            <h3 style="font-size:14px">Подсветка дисплея</h3>
+            <div class="fields">
+              <div><label class="f" for="cDispBright">Яркость днём, %</label><input type="number" id="cDispBright" min="5" max="100"></div>
+              <div><label class="f" for="cDispNight">Яркость ночью, %</label><input type="number" id="cDispNight" min="0" max="100"></div>
+              <div><label class="f" for="cDispSleep">Гасить через, мин</label><input type="number" id="cDispSleep" min="0" max="240"></div>
+            </div>
+            <div style="height:10px"></div>
+            <label class="switch"><input type="checkbox" id="cDispNightDim"> Приглушать ночью</label>
+            <p class="muted small">Ночь — время, когда лампа по расписанию выключена. «Гасить через» 0 — экран не гаснет. Открытие двери и тревоги сразу включают экран на полную яркость.</p>
             <div class="sep"></div>
             <div class="row">
               <button type="button" class="btn light sm" id="btnTare">Обнулить весы</button>
@@ -647,11 +660,10 @@ nav button.active{border-bottom-width:2px}
     <div class="stack">
       <label class="switch"><input type="checkbox" id="pModHum"> Увлажнение</label>
       <label class="switch"><input type="checkbox" id="pModHeat"> Нагрев</label>
-      <label class="switch"><input type="checkbox" id="pModFan"> Вентиляция</label>
+      <label class="switch"><input type="checkbox" id="pModFan"> Обдув (проветривание)</label>
       <div class="fields" id="pFanFields">
         <div><label class="f" for="pFanEvery">Проветривать каждые, мин</label><input type="number" id="pFanEvery" min="0"></div>
         <div><label class="f" for="pFanFor">На сколько, мин</label><input type="number" id="pFanFor" min="0"></div>
-        <div><label class="f" for="pFanSpeed">Скорость, %</label><input type="number" id="pFanSpeed" min="0" max="100"></div>
       </div>
     </div>
     <div id="pErr" class="small" style="color:var(--danger);min-height:18px;margin-top:10px"></div>
@@ -667,7 +679,7 @@ nav button.active{border-bottom-width:2px}
     <h2>Иконка пресета</h2>
     <input type="text" id="iconSearch" placeholder="Поиск: томат, базилик, роза, гриб…">
     <div class="cats" id="iconCats"></div>
-    <div class="icon-grid" id="iconGrid"></div>
+    <div class="icon-grid" id="iconGrid" data-noi18n></div>
     <div class="sep"></div>
     <div class="between">
       <div>
@@ -800,8 +812,458 @@ const firebaseConfig = {
   appId: "1:106904784961:web:b09c5b48840b29b3aff6c0"
 };
 const DEVICE_ID = "growbox";
+/* ===================== ЯЗЫК СТРАНИЦЫ (RU / EN) =====================
+   Страница пишется по-русски, английский подставляется на лету по словарю I18N_EN
+   (точные фразы) и шаблонам I18N_RX (фразы с числами и названиями). */
+let LANG = (() => { try { return localStorage.getItem("gb.lang") || "ru"; } catch(e){ return "ru"; } })();
+const I18N_MISS = new Set();
+window.__i18nMiss = I18N_MISS;
+const HAS_CYR = /[А-Яа-яЁё]/;
+function tr(s){
+  if(LANG !== "en" || s === null || s === undefined) return s;
+  const str = String(s), k = str.trim();
+  if(!k || !HAS_CYR.test(k)) return str;
+  let r = I18N_EN[k];
+  if(r === undefined){
+    for(const [re, rp] of I18N_RX){
+      const m = k.match(re);
+      if(m){ r = typeof rp === "function" ? rp(...m) : k.replace(re, rp); break; }
+    }
+  }
+  if(r === undefined) r = trParts(k);
+  if(r === undefined){ I18N_MISS.add(k); return str; }
+  return str.replace(k, r);
+}
+// запасной перевод по частям: известные фразы заменяются от длинных к коротким
+let TR_PARTS_RX = null; const TR_CACHE = new Map();
+function trParts(k){
+  if(TR_CACHE.has(k)) return TR_CACHE.get(k);
+  if(!TR_PARTS_RX){
+    const keys = Object.keys(I18N_EN).filter(x => HAS_CYR.test(x) && !/[<>]/.test(x)).sort((a,b) => b.length - a.length);
+    const esc = x => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    TR_PARTS_RX = new RegExp("(?<![А-Яа-яЁё])(" + keys.map(esc).join("|") + ")(?![А-Яа-яЁё])", "g");
+  }
+  let out = k.replace(TR_PARTS_RX, m => I18N_EN[m]);
+  // вложенные шаблоны для кусков в кавычках «…»
+  out = out.replace(/«([^»]+)»/g, (m, x) => "«" + (HAS_CYR.test(x) ? (I18N_EN[x] ?? x) : x) + "»");
+  const res = HAS_CYR.test(out.replace(/«[^»]*»/g, "")) ? undefined : out;
+  TR_CACHE.set(k, res);
+  return res;
+}
+const trq = s => tr(String(s).trim());   // перевод вложенных частей шаблонов
+const TR_ATTRS = ["placeholder", "title", "aria-label"];
+function trNode(n){
+  if(LANG !== "en" || !n) return;
+  if(n.nodeType === 3){
+    const v = n.nodeValue;
+    if(n.__en === v || !HAS_CYR.test(v)) return;
+    const p = n.parentNode;
+    if(p && p.closest && p.closest("[data-noi18n],script,style,textarea")) return;
+    const t = tr(v);
+    if(t !== v){ n.__en = t; n.nodeValue = t; }
+  } else if(n.nodeType === 1){
+    if(n.matches && n.matches("[data-noi18n],script,style")) return;
+    for(const a of TR_ATTRS){
+      const v = n.getAttribute(a);
+      if(v && HAS_CYR.test(v)){ const t = tr(v); if(t !== v) n.setAttribute(a, t); }
+    }
+    if(n.tagName === "INPUT" && n.disabled && HAS_CYR.test(n.value)) n.value = tr(n.value);
+    if(n.tagName === "TEXTAREA") return;
+    for(const c of n.childNodes) trNode(c);
+  }
+}
+function startI18n(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("#langSeg button").forEach(b => {
+    b.classList.toggle("on", b.dataset.l === LANG);
+    b.onclick = () => { if(b.dataset.l === LANG) return; try { localStorage.setItem("gb.lang", b.dataset.l); } catch(e){} location.reload(); };
+  });
+  if(LANG !== "en") return;
+  trNode(document.body);
+  new MutationObserver(list => {
+    for(const m of list){
+      if(m.type === "characterData") trNode(m.target);
+      else if(m.type === "attributes") trNode(m.target);
+      else m.addedNodes.forEach(trNode);
+    }
+  }).observe(document.body, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:TR_ATTRS});
+}
+
 const DEMO_FORCE = false;
 const DEMO = DEMO_FORCE || typeof firebase === "undefined" || !firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("YOUR");
+
+/* ===== I18N BEGIN ===== */
+/* ---------- Английский словарь: точные фразы и части фраз ---------- */
+const I18N_EN = {
+  // навигация и шапка
+  "Обзор":"Overview","Графики":"Charts","Управление":"Control","Пресеты":"Presets","Модули":"Modules","Журнал":"Log",
+  "← Обзор":"← Overview","Бокс онлайн":"Box online","Бокс: ожидание":"Box: waiting","Бокс офлайн":"Box offline","Без пресета":"No preset",
+  "Подключение к облаку…":"Connecting to the cloud…","Не удалось подключиться к облаку":"Could not connect to the cloud",
+  "Инструменты":"Tools","Исследование":"Research","Исследования":"Research","Адаптация":"Adaptation","Калькуляторы":"Calculators",
+  "Диагностика и калибровка":"Diagnostics & calibration","Опыт с параметрами и сравнение «до / во время»":"Experiment with parameters and a before / during comparison",
+  "Плавный переход к новым условиям":"Smooth transition to new conditions","VPD, DLI, удобрения, потребность в воде":"VPD, DLI, fertilizer, water demand",
+  "Датчики, весы, порог воды":"Sensors, scale, water threshold",
+  "Демо-режим: показаны примерные данные. Впишите свой firebaseConfig в начало скрипта, и страница подключится к настоящему боксу.":"Demo mode: sample data is shown. Put your firebaseConfig at the top of the script and the page will connect to the real box.",
+  "Включите анонимный вход: Firebase → Authentication → Sign-in method → <b>Anonymous</b> → Enable. Если он уже включён: Authentication → Settings → User actions →":"Enable anonymous sign-in: Firebase → Authentication → Sign-in method → <b>Anonymous</b> → Enable. If it is already on: Authentication → Settings → User actions →",
+  "Нет связи с интернетом.":"No internet connection.","Проверьте firebaseConfig в начале скрипта: неверный apiKey.":"Check firebaseConfig at the top of the script: invalid apiKey.",
+
+  // обзор
+  "Активный пресет":"Active preset","Сменить":"Change","Старт":"Start","Завершить":"Finish","Добавить заметку":"Add note",
+  "Заметки":"Notes","Заметка":"Note","Напоминания":"Reminders","День":"Day","В норме":"In range","Вода":"Water",
+  "Выращивание не запущено: действуют параметры последнего этапа. Нажмите «Старт», чтобы этапы шли по дням, а данные, поливы и заметки собирались в отдельную запись журнала.":"No grow is running: the last stage's settings apply. Press «Start» so stages advance by day and data, watering and notes are collected into a separate log entry.",
+  "Пока нет заметок. Записывайте всходы, подкормки, проблемы и урожай — они сохранятся в журнале выращивания.":"No notes yet. Record sprouting, feeding, problems and harvest — they are saved to the grow log.",
+  "Условия в норме":"Conditions OK","Вне нормы:":"Out of range:","нет данных":"no data","Нет данных":"No data",
+  "Полить сейчас":"Water now","Полить":"Water","Лампа UV":"UV lamp","Авто":"Auto","Вкл":"On","Выкл":"Off",
+  "UV: всегда включена":"UV: always on","UV: выключена":"UV: off","UV: тёмный этап":"UV: dark stage",
+  "Полив выключен на этом этапе":"Watering is off at this stage","Идёт полив":"Watering",
+  "Показатели":"Readings","Выбрать показатели":"Choose readings","Показывать на обзоре":"Show on overview","Показать все":"Show all","По умолчанию":"Default",
+  "Все показатели скрыты. Нажмите ••• рядом с заголовком, чтобы выбрать.":"All readings are hidden. Press ••• next to the title to choose.",
+  "Скрыто показателей:":"Hidden readings:",". Их можно включить через •••.":". You can turn them on via •••.","Их можно включить через •••.":"You can turn them on via •••.",
+  "Температура":"Temperature","Влажность":"Humidity","CO₂":"CO₂","TVOC":"TVOC","Вес":"Weight","UV-лампа":"UV lamp","Дверь":"Door",
+  "Точка росы":"Dew point","Основной свет":"Main light","Закрыта":"Closed","Открыта":"Open","Есть":"OK","Нет":"None","Долив":"Refilling",
+  "цель":"target","макс":"max","датчик прогревается":"sensor warming up","повышено":"elevated","летучие соединения":"volatile compounds",
+  "растение и субстрат":"plant and substrate","уровень датчика":"sensor level","основной свет":"main light","по расписанию":"on schedule",
+  "всегда вкл":"always on","выключена":"off","тёмный этап":"dark stage","конденсат ниже этой температуры":"condensation below this temperature",
+  "включается при открытой двери":"turns on when the door is open","отличный сигнал":"excellent signal","нормальный сигнал":"good signal","слабый сигнал":"weak signal",
+  "Вес и потребление воды":"Weight & water use","VPD и климатические пояса":"VPD & climate zones","Сейчас":"Now","Последний полив":"Last watering",
+  "Ушло воды с полива":"Water used since watering","Скорость расхода":"Use rate","Изменение за":"Change over","Нет данных о весе":"No weight data",
+  "Вес падает между поливами за счёт испарения и потребления воды растением. Быстрое падение — жарко или сухо, почти без изменений — субстрат переувлажнён.":"Weight drops between waterings due to evaporation and plant uptake. A fast drop means hot or dry air; almost no change means the substrate is waterlogged.",
+  "VPD сейчас":"VPD now","Оценка":"Rating","Условия похожи на пояс":"Conditions resemble zone","ни один из базовых":"none of the basic ones",
+  "VPD показывает, насколько сильно воздух «тянет» влагу из листьев. Он точнее одной влажности говорит, комфортно ли растению.":"VPD shows how strongly the air pulls moisture from the leaves. It tells better than humidity alone whether the plant is comfortable.",
+  "Экваториальный":"Equatorial","Тропический (сухой)":"Tropical (dry)","Умеренный":"Temperate","Арктический":"Arctic",
+  "слишком влажно, риск плесени":"too humid, mould risk","мягко — рассада, черенки, микрозелень":"gentle — seedlings, cuttings, microgreens",
+  "оптимально для вегетации":"optimal for vegetative growth","сухо — подходит для цветения":"dry — suits flowering","слишком сухо":"too dry",
+  "Модули включены:":"Modules on:","Модули: нагрев, увлажнение и обдув не нужны":"Modules: no heating, humidifying or ventilation needed",
+  "нагрев":"heating","увлажнение":"humidifying","обдув":"ventilation",
+  "Бокс не на связи":"Box is offline",". Проверьте питание и Wi-Fi.":". Check power and Wi-Fi.","Проверьте питание и Wi-Fi.":"Check power and Wi-Fi.",
+  "Дверь открыта слишком долго — закройте дверь":"The door has been open too long — close it","Нет воды: подключите резервуар или подачу воды":"No water: connect the tank or water supply",
+  "Ошибка датчика BME280 (температура, влажность)":"BME280 sensor error (temperature, humidity)","Ошибка датчика CCS811 (CO₂, TVOC)":"CCS811 sensor error (CO₂, TVOC)",
+  "Ошибка весов HX711":"HX711 scale error","Бокс ещё не получил точное время — расписание работает по таймеру":"The box has no exact time yet — the schedule runs on a timer",
+  "Напоминание:":"Reminder:","сегодня":"today","завтра":"tomorrow",
+
+  // выращивание и заметки
+  "Новая заметка":"New note","Тип":"Type","Дата и время":"Date and time","Текст":"Text","Фото":"Photo","Сжимается до 900 пикселей":"Resized to 900 pixels",
+  "Добавить фото":"Add photo","Напомнить":"Remind me","Когда":"When","Текст напоминания":"Reminder text",
+  "Бокс отправит напоминание в Telegram, даже если страница закрыта.":"The box sends the reminder to Telegram even if the page is closed.",
+  "Что заметили: всходы, цвет листьев, запах, подкормка…":"What did you notice: sprouts, leaf colour, smell, feeding…","например: подкормка":"e.g. feeding",
+  "Наблюдение":"Observation","Полив и подкормка":"Watering & feeding","Проблема":"Problem","Пересадка и прореживание":"Transplanting & thinning","Урожай":"Harvest","Другое":"Other",
+  "Напишите текст или добавьте фото":"Write text or add a photo","Время напоминания должно быть в будущем":"The reminder time must be in the future",
+  "Заметка и напоминание сохранены":"Note and reminder saved","Заметка сохранена":"Note saved","Фото к заметке":"Note photo",
+  "Не удалось прочитать фото. Попробуйте другой файл.":"Could not read the photo. Try another file.",
+  "Завершить выращивание":"Finish the grow","Урожай, г":"Harvest, g","можно оставить пустым":"can be left empty","Итоговая заметка":"Final note",
+  "Что получилось, что изменить в следующий раз":"What worked, what to change next time","Завершить и сохранить итоги":"Finish and save the results",
+  "Выращивание завершено, итоги в журнале":"Grow finished, results are in the log","Итоги и все данные сохранятся в журнале.":"The results and all data are saved to the log.",
+  ". Итоги и все данные сохранятся в журнале.":". The results and all data are saved to the log.","Сначала выберите пресет":"Choose a preset first",
+  "отправлено":"sent","пора":"due","напоминание":"reminder",
+
+  // графики
+  "Колесо мыши или два пальца — масштаб, перетаскивание — сдвиг по времени. Все графики двигаются вместе.":"Mouse wheel or two fingers to zoom, drag to pan in time. All charts move together.",
+  "Колесо мыши или два пальца — масштаб, перетаскивание — сдвиг.":"Mouse wheel or two fingers to zoom, drag to pan.",
+  "Сбросить масштаб":"Reset zoom","Экспорт CSV":"Export CSV","Выращивание: не выбрано":"Grow: none selected","Температура и влажность":"Temperature & humidity",
+  "CO₂ и TVOC":"CO₂ & TVOC","Полив":"Watering","Тревога":"Alarm","Старт, этап, финиш выращивания":"Grow start, stage, finish","Время":"Time",
+  "Сделать главным":"Make main","Убрать из главных":"Remove from main","Развернуть":"Expand","Показано:":"Shown:","точек:":"points:",
+  "За выбранный период данных нет":"No data for the selected period","Температура, °C":"Temperature, °C","Влажность, %":"Humidity, %","VPD, кПа":"VPD, kPa",
+  "CO₂, ppm":"CO₂, ppm","TVOC, ppb":"TVOC, ppb","Вес, г":"Weight, g","Старт:":"Start:","Финиш":"Finish","Всё":"All","дня":"days","дней":"days",
+  "Период":"Period","Свой":"Custom","С":"From","По":"To","Шаг":"Step","Все точки (5 мин)":"All points (5 min)","Среднее за час":"Hourly average","Среднее за день":"Daily average",
+  "Скачать CSV":"Download CSV","В демо-режиме файл формируется из примерных данных.":"In demo mode the file is built from sample data.","Выберите выращивание":"Choose a grow",
+  "Начало периода должно быть раньше конца":"The period start must be before the end","Выберите хотя бы один показатель":"Choose at least one reading",
+  "За этот период данных нет":"No data for this period","строк":"rows","Выращиваний пока нет":"No grows yet","Выращивание":"Grow","(идёт)":"(running)",
+
+  // управление
+  "Полив по расписанию":"Scheduled watering","Время полива (до 6 раз в день)":"Watering times (up to 6 per day)","Время полива":"Watering time","Добавить время":"Add time",
+  "Удалить время":"Remove time","Объём за раз, мл":"Volume per watering, ml","Раз в N дней":"Every N days","Насос, мл/с":"Pump, ml/s","Калибровка насоса":"Pump calibration",
+  "Поставьте мерный стакан под выход полива, нажмите «Налить 10 с», затем введите, сколько налилось. Производительность рассчитается и сохранится.":"Put a measuring cup under the outlet, press «Pour 10 s», then enter how much was poured. The flow rate is calculated and saved.",
+  "Налить 10 с":"Pour 10 s","налилось, мл":"poured, ml","Рассчитать":"Calculate","Общий режим":"General mode","Авто — по расписанию пресета":"Auto — preset schedule",
+  "Всегда включена":"Always on","Выключена":"Off","Свет на этом этапе":"Light at this stage","Включение":"On at","Выключение":"Off at","Яркость, %":"Brightness, %",
+  "Световой день:":"Day length:","При открытой двери UV всегда плавно гаснет.":"With the door open, UV always fades out.","Цели климата":"Climate targets",
+  "Задаются пресетом, можно поправить вручную. По ним работают модули в режиме «Авто».":"Set by the preset and can be adjusted manually. Modules in «Auto» mode follow them.",
+  "Темп. мин, °C":"Temp. min, °C","Темп. макс, °C":"Temp. max, °C","Влажн. мин, %":"Hum. min, %","Влажн. макс, %":"Hum. max, %","CO₂ макс, ppm":"CO₂ max, ppm",
+  "Уведомления Telegram":"Telegram notifications","Отправлять тревоги и напоминания":"Send alarms and reminders","Токен бота":"Bot token","Сообщать о каждом поливе":"Report every watering",
+  "Бота создайте в @BotFather, свой Chat ID узнайте у @userinfobot, затем напишите боту /start.":"Create a bot in @BotFather, get your Chat ID from @userinfobot, then send /start to your bot.",
+  "Отправить тест":"Send test","Устройство":"Device","Предупреждение о двери, мин":"Door warning, min","Часовой пояс":"Time zone","(Москва)":"(Moscow)",
+  "Язык дисплея бокса":"Box display language","Русский":"Russian","Обнулить весы":"Tare scale","Перезагрузить бокс":"Restart box","Архив данных":"Data archive",
+  "Подробная история (точка каждые 5 минут) хранится 30 дней. Более старые данные сжимаются до средних значений за час: графики остаются, а база не разрастается. Данные завершённых выращиваний хранятся всегда.":"Detailed history (a point every 5 minutes) is kept for 30 days. Older data is compressed to hourly averages: charts remain and the database does not grow. Finished grows are kept forever.",
+  "Сжать старую историю сейчас":"Compress old history now","Есть несохранённые изменения":"There are unsaved changes","Отменить":"Cancel","Сохранить":"Save",
+  "Минимум должен быть меньше максимума":"Minimum must be less than maximum","Добавьте хотя бы одно время полива":"Add at least one watering time",
+  "Настройки сохранены — бокс применит их в течение 5 секунд":"Settings saved — the box applies them within 5 seconds","Насос включится на 10 секунд":"The pump runs for 10 seconds",
+  "Введите, сколько миллилитров налилось":"Enter how many millilitres were poured","Производительность насоса:":"Pump flow rate:","мл/с — сохранено":"ml/s — saved",
+  "Сначала сохраните настройки":"Save the settings first","Бокс отправит тестовое сообщение":"The box will send a test message","Весы будут обнулены":"The scale will be tared",
+  "Обнулить весы? Уберите с платформы всё, что не должно учитываться.":"Tare the scale? Remove everything from the platform that should not be counted.","Обнулить":"Tare",
+  "Перезагрузить бокс?":"Restart the box?","Перезагрузить":"Restart","Бокс перезагружается":"The box is restarting","В демо-режиме архив не сжимается":"The archive is not compressed in demo mode",
+  "Старых данных для сжатия нет":"No old data to compress","Сжато точек:":"Points compressed:","Последнее сжатие:":"Last compression:","Бокс ещё не отправлял данные":"The box has not sent data yet",
+  "Прошивка":"Firmware","Без перезагрузки:":"Uptime:","данные":"data","Укажите объём от 1 до 2000 мл":"Enter a volume from 1 to 2000 ml",
+  "Команда отправлена — полив начнётся через несколько секунд":"Command sent — watering starts in a few seconds","Режим UV:":"UV mode:","Объём полива:":"Watering volume:",
+  "Идёт выращивание «":"Grow running «",
+
+  // пресеты
+  "Пресеты растений":"Plant presets","Сохранить текущие настройки":"Save current settings","Свой пресет":"Custom preset","Библиотека и фильтр пресетов":"Preset library & filter",
+  "Пресет задаёт этапы роста (климат, полив и свет на каждом этапе) и какие модули нужны. Этапы переключаются сами по дням после нажатия «Старт». Значения стартовые, их можно поправить под свой сорт.":"A preset defines growth stages (climate, watering and light for each stage) and which modules are needed. Stages switch automatically by day after «Start». The values are starting points — adjust them to your variety.",
+  "Показать":"Show","Все":"All","Встроенные":"Built-in","Из библиотеки":"From library","Мои":"Mine","Скрытые":"Hidden","Библиотека пресетов":"Preset library",
+  "растений: добавить в список":"plants: add to the list","Показаны все":"Showing all","Только встроенные":"Built-in only","Только из библиотеки":"Library only","Только мои":"Mine only",
+  "Скрытые пресеты":"Hidden presets","встроенный":"built-in","из библиотеки":"from library","мой":"mine","Этапы:":"Stages:","Один этап":"Single stage",
+  "Температура ":"Temperature ","Объём":"Volume","Свет":"Light","CO₂ до":"CO₂ up to","выключен":"off","без модулей":"no modules","Модули:":"Modules:",
+  "Активен":"Active","Применить":"Apply","Изменить":"Edit","Удалить":"Delete","Копировать":"Copy","Скрыть":"Hide","Убрать":"Remove","Вернуть в список":"Restore",
+  "Скрытых пресетов нет":"No hidden presets","Здесь пока пусто. Добавьте пресеты из библиотеки через •••.":"Nothing here yet. Add presets from the library via •••.",
+  "Активный пресет нельзя удалить — сначала примените другой":"The active preset cannot be deleted — apply another one first","Удалить этот пресет?":"Delete this preset?",
+  "Пресет удалён":"Preset deleted","Активный пресет нельзя скрыть":"The active preset cannot be hidden","Пресет скрыт. Вернуть можно в ••• → Скрытые":"Preset hidden. Restore it via ••• → Hidden",
+  "Пресет возвращён":"Preset restored","Активный пресет нельзя убрать":"The active preset cannot be removed","Пресет убран из списка, он остаётся в библиотеке":"Preset removed from the list; it stays in the library",
+  "Готовые пресеты по справочнику растений. Добавленные появятся в общем списке с пометкой «из библиотеки».":"Ready presets from the plant guide. Added ones appear in the main list marked «from library».",
+  "Поиск: огурец, мята, лимон, вёшенка…":"Search: cucumber, mint, lemon, oyster mushroom…","в списке":"in list","Добавить":"Add","Пресет добавлен в список":"Preset added to the list",
+  "Ничего не нашлось":"Nothing found","Закрыть":"Close","Новый пресет":"New preset","Изменить пресет":"Edit preset","Название":"Name","Описание":"Description",
+  "например: мой сорт, после пикировки":"e.g. my variety, after pricking out","Выбрать иконку":"Choose icon","Этапы роста":"Growth stages",
+  "Этапы идут по порядку с первого дня выращивания. Последний этап длится до нажатия «Завершить». Без запущенного выращивания действует последний этап.":"Stages run in order from day one of the grow. The last stage lasts until you press «Finish». Without a running grow the last stage applies.",
+  "Добавить этап":"Add stage","Этап":"Stage","Удалить этап":"Delete stage","Название этапа":"Stage name","Длительность, дней":"Duration, days","до завершения":"until finish",
+  "Климат":"Climate","Темп. мин":"Temp. min","Темп. макс":"Temp. max","Влажн. мин":"Hum. min","Влажн. макс":"Hum. max","CO₂ макс":"CO₂ max",
+  "Поливать на этом этапе":"Water at this stage","Время через запятую":"Times, comma-separated","Объём, мл":"Volume, ml","Свет (UV)":"Light (UV)",
+  "Модули в этом пресете":"Modules in this preset","Модуль в режиме «Авто», который пресет не использует, будет выключен.":"A module in «Auto» mode that the preset does not use is switched off.",
+  "Увлажнение":"Humidifying","Нагрев":"Heating","Обдув (проветривание)":"Ventilation (fan)","Проветривать каждые, мин":"Ventilate every, min","На сколько, мин":"For how long, min",
+  "Отмена":"Cancel","Сохранить пресет":"Save preset","Введите название":"Enter a name","минимум должен быть меньше максимума":"minimum must be less than maximum",
+  "время полива в формате ЧЧ:ММ через запятую":"watering times as HH:MM, comma-separated","Время полива в формате ЧЧ:ММ через запятую":"Watering times as HH:MM, comma-separated",
+  "не больше 6 поливов в день":"no more than 6 waterings per day","укажите объём полива":"enter the watering volume","Пресет сохранён":"Preset saved",
+  "Активный пресет обновлён и применён":"Active preset updated and applied","Не больше 6 этапов":"No more than 6 stages","Справочник растений":"Plant guide",
+  "Найти температуру, влажность, свет и полив для растения":"Find temperature, humidity, light and watering for a plant","Скрыть ":"Hide ",
+  "Название: томат, манго, базилик, орхидея…":"Name: tomato, mango, basil, orchid…","Ничего не нашлось. Попробуйте другое название.":"Nothing found. Try another name.",
+  "Стартовые диапазоны для закрытого грунта. Под конкретный сорт их стоит поправить по опыту.":"Starting ranges for indoor growing. Adjust them for your variety from experience.",
+  "VPD в середине диапазона":"VPD mid-range","Прорастание":"Germination","в темноте":"in darkness","при":"at","Подставить климат, свет и полив":"Insert climate, light and watering",
+  "Заполнить весь пресет":"Fill the whole preset","Значения подставлены в этап":"Values inserted into stage","Пресет заполнен по справочнику":"Preset filled from the guide",
+  "Иконка пресета":"Preset icon","Поиск: томат, базилик, роза, гриб…":"Search: tomato, basil, rose, mushroom…","Своя картинка":"Own image",
+  "Фото или рисунок, автоматически уменьшается до 128×128":"Photo or drawing, automatically resized to 128×128","Загрузить":"Upload",
+  "Ничего не нашлось. Загрузите свою картинку ниже.":"Nothing found. Upload your own image below.","Не удалось прочитать картинку":"Could not read the image",
+  "Начать выращивание «":"Start the grow «","Применить пресет «":"Apply preset «","Сменить пресет на «":"Switch preset to «",
+
+  // модули
+  "Активные и задействованные модули":"Active and engaged modules","Активные":"Active","Задействованные":"Engaged","Активные — подключены":"Active — connected",
+  "Задействованные в пресете":"Engaged by the preset","Нет модулей на связи":"No modules online","Текущий пресет не использует модули":"The current preset uses no modules",
+  "на связи, ожидает":"online, idle","работает:":"running:","также в:":"also in:","Только активные":"Active only","Только задействованные":"Engaged only",
+  "Как подключить новый модуль":"How to connect a new module","1. Установите модуль на боковую ленту 5 В — он включится сам.":"1. Put the module on the 5 V side rail — it powers on by itself.",
+  "2. При первом запуске модуль создаёт Wi-Fi сеть":"2. On first start the module creates the Wi-Fi network",". Подключитесь к ней с телефона и выберите домашнюю сеть.":". Connect to it from a phone and choose your home network.",
+  "3. Через несколько секунд модуль появится выше. Его можно переименовать и настроить.":"3. In a few seconds the module appears above. You can rename and configure it.",
+  "В режиме «Авто» модуль сам следует целям активного пресета и его этапов. Сброс Wi-Fi модуля: удерживать кнопку BOOT 5 секунд.":"In «Auto» mode the module follows the active preset and its stages. To reset the module's Wi-Fi, hold BOOT for 5 seconds.",
+  "Модули пока не подключены. Установите модуль на ленту 5 В — он появится здесь автоматически.":"No modules connected yet. Put a module on the 5 V rail — it appears here automatically.",
+  "Под выбранный фильтр модулей нет.":"No modules match the filter.","онлайн":"online","офлайн":"offline","Работает":"Running","Выключен":"Off",
+  "Задействован в пресете":"Engaged by the preset","Не используется пресетом":"Not used by the preset","пауза":"pause","перегрев":"overheat","слишком влажно":"too humid",
+  "нет данных бокса":"no box data","Насос качает":"Pump running","Нет воды в резервуаре":"No water in the tank","Мало воды в бачке":"Low water in the reservoir","Сигнал бокса: вкл":"Box signal: on",
+  "Причина:":"Reason:","сигнал":"signal","дБм":"dBm","обновлено":"updated","Нет связи":"No connection",". Проверьте, стоит ли модуль на ленте питания.":". Check that the module sits on the power rail.",
+  "Проверьте, стоит ли модуль на ленте питания.":"Check that the module sits on the power rail.",
+  "Режим":"Mode","Свои пороги вместо пресета":"Own thresholds instead of the preset","Включать ниже,":"Turn on below,","Выключать при,":"Turn off at,",
+  "Макс. работа, мин":"Max run, min","Пауза, мин":"Pause, min","Аварийный макс, °C":"Emergency max, °C","Аварийный макс, %":"Emergency max, %","Насос подкачки":"Refill pump",
+  "Перед стартом, с":"Before start, s","Подкачивать каждые, мин":"Refill every, min","На сколько, с":"For how long, s",
+  "Если в бачке стоит поплавок уровня, насос качает только когда воды мало, а эти времена не используются.":"If the reservoir has a float switch, the pump only runs when water is low and these times are not used.",
+  "T макс, °C":"T max, °C","Пороги и расписание здесь работают только при включённых «Своих порогах». В режиме «Авто» обдув следует сигналу бокса и расписанию пресета.":"These thresholds and schedule only apply with «Own thresholds» on. In «Auto» the fan follows the box signal and the preset schedule.",
+  "Настройки этого типа модуля появятся в следующей версии страницы.":"Settings for this module type will come in a later version of the page.",
+  "Тест 10 с":"Test 10 s","Подкачать 5 с":"Refill 5 s","Настройки модуля сохранены":"Module settings saved","Модуль включится на 10 секунд":"The module turns on for 10 seconds",
+  "Насос подкачает воду 5 секунд":"The pump refills for 5 seconds","Удалить модуль со страницы? Если он включён, то зарегистрируется снова с настройками по умолчанию.":"Remove the module from the page? If it is powered, it registers again with default settings.",
+  "Модуль удалён":"Module removed","Модуль":"Module","Увлажнитель":"Humidifier","Нагреватель":"Heater","Обдув":"Ventilation","Вентиляция":"Ventilation","Камера":"Camera",
+  "Текущий пресет этот модуль не использует — в режиме «Авто» он выключен.":"The current preset does not use this module — in «Auto» mode it is off.",
+
+  // журнал
+  "События":"Events","Выращивания":"Grows","Тревоги":"Alarms","Событий пока нет":"No events yet","Событий нет":"No events","Бокс":"Box","Страница":"Page",
+  "Завершённые выращивания":"Finished grows","Пресет":"Preset","Даты":"Dates","Дней":"Days","Средн. T":"Avg T","Средн. влажн.":"Avg hum.","г/день":"g/day","мл воды на 1 г":"ml water per 1 g",
+  "Пока нет завершённых выращиваний. Нажмите «Старт» в карточке пресета на обзоре, а по окончании — «Завершить».":"No finished grows yet. Press «Start» on the preset card in the overview, and «Finish» when done.",
+  "Нажмите на строку, чтобы открыть заметки, графики и CSV этого выращивания.":"Click a row to open the notes, charts and CSV of that grow.","Открыть":"Open","Идёт с":"Running since",
+  "Длительность":"Duration","Средняя температура":"Average temperature","Мин / макс":"Min / max","Средняя влажность":"Average humidity","Средний VPD":"Average VPD",
+  "Время в норме":"Time in range","Вода за выращивание":"Water per grow","Вес в начале / в конце":"Weight at start / end","Урожай в день":"Harvest per day",
+  "Воды на 1 г урожая":"Water per 1 g of harvest","Этапы":"Stages","Смены пресета":"Preset changes","Заметок нет":"No notes","Показать на графиках":"Show on charts",
+  "идёт, день":"running, day","день":"day","дн":"d",
+
+  // исследования
+  "Идёт исследование":"Research running","Остановить":"Stop","осталось":"remaining","завершено":"finished","Наблюдения":"Observations",
+  "Что видно: листья, тургор, цвет, рост…":"What you see: leaves, turgor, colour, growth…","Пока нет наблюдений":"No observations yet","Наблюдение сохранено":"Observation saved",
+  "Новое исследование":"New research","Бокс держит параметры опыта заданное время, затем сам возвращается к пресету. После окончания страница сравнит период опыта с таким же периодом до него.":"The box holds the experiment settings for the given time, then returns to the preset by itself. Afterwards the page compares the experiment with an equal period before it.",
+  "например: базилик при 28 °C":"e.g. basil at 28 °C","Единицы":"Units","часы":"hours","дни":"days","Гипотеза":"Hypothesis",
+  "Что ожидаете увидеть. Например: при 28 °C расход воды вырастет, а листья не потеряют тургор":"What do you expect? For example: at 28 °C water use rises and the leaves keep their turgor",
+  "Свет включён":"Light on","Начать исследование":"Start research","Завершённые исследования":"Finished research","остановлено досрочно":"stopped early",
+  "Показатель":"Reading","До опыта":"Before","Во время":"During","Разница":"Difference","Расход воды растением":"Plant water use","Средний CO₂":"Average CO₂",
+  "Время в целевом диапазоне опыта:":"Time within the experiment's target range:","Посчитать результаты":"Calculate results","Вывод":"Conclusion","Что показал опыт":"What the experiment showed",
+  "Вывод сохранён":"Conclusion saved","На графиках":"On charts","Завершённых исследований пока нет":"No finished research yet","Исследование запущено":"Research started",
+  "Остановить исследование досрочно? Бокс сразу вернётся к параметрам пресета.":"Stop the research early? The box returns to the preset settings right away.",
+  "Начать":"Start","Микрозелень при 26 °C":"Microgreens at 26 °C","При 26 °C расход воды вырастет примерно на треть, листья не потеряют тургор":"At 26 °C water use rises by about a third and the leaves keep turgor",
+  "К вечеру края листьев горошка чуть подсохли":"By evening the pea leaf edges dried slightly",
+  "Расход воды вырос на 37%, при 26 °C нужно поднимать влажность или объём полива":"Water use rose by 37%; at 26 °C raise humidity or the watering volume",
+
+  // адаптация
+  "Идёт адаптация":"Adaptation running","Завершить сейчас":"Finish now","Параметр":"Parameter","Было":"Was","Цель":"Target",
+  "Объём полива":"Watering volume","выкл":"off","Бокс пересчитывает цели каждую минуту, модули в режиме «Авто» идут за ними.":"The box recalculates targets every minute; modules in «Auto» follow them.",
+  "Новая адаптация":"New adaptation","Плавный переход от текущих условий к новым: температура, влажность, длина и яркость света меняются постепенно. Полезно при пересадке, смене пресета, переходе растения из рассады во взрослую фазу или из магазина в бокс.":"A smooth transition from the current conditions to new ones: temperature, humidity, day length and brightness change gradually. Useful after transplanting, a preset change, moving from seedling to mature stage or from a shop into the box.",
+  "Перейти к":"Go to","Своим значениям":"Custom values","Свои значения":"Custom values","Как будет меняться":"How it will change","Момент":"Moment","Финиш ":"Finish ",
+  "Начать адаптацию":"Start adaptation","Адаптация запущена":"Adaptation started","Плавный переход":"Smooth transition",
+  "Завершить адаптацию сейчас? Сразу начнут действовать целевые параметры.":"Finish the adaptation now? The target settings apply immediately.","Адаптация завершена досрочно":"Adaptation finished early",
+
+  // калькуляторы
+  "Влажность для нужного VPD":"Humidity for a target VPD","Температура воздуха, °C":"Air temperature, °C","Целевой VPD, кПа":"Target VPD, kPa","Лист холоднее воздуха на, °C":"Leaf cooler than air by, °C",
+  "Нужна влажность":"Required humidity","При такой температуре этот VPD недостижим":"This VPD cannot be reached at this temperature",
+  "Ориентиры VPD: рассада и черенки 0,4–0,8; вегетация 0,8–1,2; цветение 1,2–1,6 кПа. Под светодиодами лист обычно на 1–2 °C холоднее воздуха.":"VPD guide: seedlings and cuttings 0.4–0.8; vegetative 0.8–1.2; flowering 1.2–1.6 kPa. Under LEDs a leaf is usually 1–2 °C cooler than the air.",
+  "Дневная сумма света (DLI)":"Daily light integral (DLI)","PPFD лампы на 100%, мкмоль/м²·с":"Lamp PPFD at 100%, µmol/m²·s","Яркость":"Brightness","Часов света":"Light hours",
+  "моль/м²·сутки":"mol/m²·day","мало света: подходит теневыносливым":"little light: suits shade plants","микрозелень, зелень, рассада":"microgreens, herbs, seedlings",
+  "салаты, травы":"lettuce, herbs","плодовые: томат, перец, огурец":"fruiting: tomato, pepper, cucumber","очень много света":"a lot of light",
+  "PPFD лампы на уровне листьев можно измерить люксметром (для белых светодиодов примерно люксы ÷ 70) или взять из паспорта лампы.":"Lamp PPFD at leaf level can be measured with a lux meter (for white LEDs roughly lux ÷ 70) or taken from the lamp datasheet.",
+  "Разведение удобрения":"Fertilizer dilution","Доза на литр":"Dose per litre","мл/л":"ml/L","г/л":"g/L","Объём воды, л":"Water volume, L","Доля от нормы, %":"Share of the dose, %",
+  "Нужно":"You need","л воды":"L of water","Для рассады и микрозелени обычно берут 25–50% от нормы на упаковке.":"For seedlings and microgreens use 25–50% of the dose on the package.",
+  "Сколько воды нужно растению":"How much water the plant needs","Нужны данные весов хотя бы за несколько часов.":"Scale data for at least a few hours is needed.",
+  "Расход по весам":"Use by scale","За сутки":"Per day","Сейчас за раз":"Now per watering","Рекомендуемо за раз":"Recommended per watering","Поставить":"Set",
+  "Расчёт по снижению веса за последние сутки. Часть воды уходит в дренаж, поэтому обычно добавляют 10–20%.":"Based on weight loss over the last day. Some water drains away, so usually add 10–20%.",
+
+  // диагностика
+  "Состояние":"Status","Узел":"Component","Значение":"Value","Связь с боксом":"Box connection","BME280 (температура, влажность)":"BME280 (temperature, humidity)",
+  "CCS811 (CO₂, TVOC)":"CCS811 (CO₂, TVOC)","HX711 (весы)":"HX711 (scale)","Датчик воды":"Water sensor","Точное время":"Exact time","Модули ":"Modules ",
+  "в порядке":"OK","ошибка":"error","прогрев":"warming up","вода есть":"water present","воды нет":"no water","получено":"received","нет":"no","из":"of","на связи":"online",
+  "коэффициент":"factor","уровень":"level","порог":"threshold","нормальный":"good","слабый":"weak",
+  "Калибровка весов":"Scale calibration","Уберите всё с платформы и нажмите «Обнулить».":"Remove everything from the platform and press «Tare».",
+  "Положите груз с известной массой (гиря, бутылка воды: 1 мл ≈ 1 г) и введите массу.":"Put a weight of known mass (a weight or a water bottle: 1 ml ≈ 1 g) and enter the mass.",
+  "масса, г":"mass, g","Откалибровать":"Calibrate","Коэффициент сохранится в памяти бокса. Результат появится в журнале.":"The factor is saved in the box memory. The result appears in the log.",
+  "Порог датчика воды":"Water sensor threshold","Уровень сейчас":"Level now","Порог сейчас":"Threshold now","Запомнить: воды нет":"Remember: no water","Запомнить: вода есть":"Remember: water present",
+  "Сохранить порог":"Save threshold","Снимите показания без воды и с водой — порог посчитается посередине.":"Take readings without and with water — the threshold is set halfway.",
+  "Введите массу груза в граммах":"Enter the weight in grams","Бокс откалибрует весы через несколько секунд":"The box calibrates the scale in a few seconds","Запомнено:":"Saved:",
+  "Порог от 100 до 4000":"Threshold from 100 to 4000","Порог сохранён":"Threshold saved","Сухо:":"Dry:","с водой:":"with water:","Порог":"Threshold",
+
+  "Подсветка дисплея":"Display backlight","Яркость днём, %":"Day brightness, %","Яркость ночью, %":"Night brightness, %","Гасить через, мин":"Turn off after, min",
+  "Приглушать ночью":"Dim at night","Ночь — время, когда лампа по расписанию выключена. «Гасить через» 0 — экран не гаснет. Открытие двери и тревоги сразу включают экран на полную яркость.":"Night is when the lamp is off by schedule. «Turn off after» 0 keeps the screen on. Opening the door or an alarm turns the screen back on at full brightness.",
+  // диалоги
+  "Загрузка…":"Loading…","Что получилось, что изменить в следующий раз":"What worked, what to change next time",
+  "Да":"Yes","Удалить ":"Delete ",
+
+  // события бокса и страницы
+  "Grow Box запущен":"Grow Box started","Настройки обновлены":"Settings updated","Весы обнулены":"Scale tared","Дверь закрыта":"Door closed","Вода снова есть":"Water is back",
+  "Ошибка BME280: нет температуры и влажности":"BME280 error: no temperature and humidity","BME280 снова работает":"BME280 works again",
+  "Ошибка CCS811: нет CO2 и TVOC":"CCS811 error: no CO2 and TVOC","CCS811 снова работает":"CCS811 works again","Весы снова работают":"Scale works again",
+  "Исследование завершено, параметры вернулись к пресету":"Research finished, settings returned to the preset","Исследование началось: действуют параметры опыта":"Research started: experiment settings apply",
+  "Адаптация завершена: действуют новые параметры":"Adaptation finished: new settings apply","Перезагрузка по команде":"Restart on command","Проветривание выключено":"Ventilation off",
+  "Калибровка не удалась: весы не видят груз. Проверьте подключение HX711":"Calibration failed: the scale does not see the weight. Check the HX711 wiring",
+  "Демо-режим: сообщение в Telegram не отправляется":"Demo mode: no Telegram message is sent","Модуль «Нагреватель» не отвечает":"Module «Heater» is not responding",
+
+  // причины работы модулей (из прошивок)
+  "запуск":"starting","тест":"test","выключен вручную":"switched off manually","включён вручную":"switched on manually","не используется в текущем пресете":"not used by the current preset",
+  "нет сигнала от бокса":"no signal from the box","нет температуры бокса":"no box temperature","нет влажности бокса":"no box humidity","перегрев - аварийно выключен":"overheat — emergency off",
+  "перегрев — аварийно выключен":"overheat — emergency off","слишком влажно - аварийно выключен":"too humid — emergency off","пауза после долгой работы":"pause after a long run",
+  "доливаю воду в бачок":"refilling the reservoir","нет воды в бачке - насос на паузе":"no water in the reservoir — pump paused","подкачка воды перед стартом":"refilling before start",
+  "нужен нагрев":"heating needed","температура в норме":"temperature OK","нужно увлажнение":"humidifying needed","влажность в норме":"humidity OK",
+  "жарко":"hot","высокая влажность":"high humidity","много CO2":"high CO2","высокий CO2":"high CO2","проветривание по расписанию":"scheduled ventilation","нужно проветривание":"ventilation needed",
+  "воздух в норме":"air OK","влажно":"humid","снижаю до нормы":"bringing back to range","своё расписание":"own schedule","не нужны":"not needed",
+  "холодно":"cold","сухо":"dry","много CO₂":"high CO₂","нет связи":"offline","никогда":"never",
+
+  // единицы и связки для сборки фраз
+  "мл":"ml","г":"g","г/ч":"g/h","кПа":"kPa","ч":"h","мин":"min","л":"L","с назад":"s ago","мин назад":"min ago","ч назад":"h ago","дн назад":"d ago",
+  "через":"in","с":"from","в":"at","до":"to","на":"for","и":"and","или":"or","раз в":"every","по":"by","также":"also",
+
+  // справочник: категории
+  "Овощи":"Vegetables","Фрукты":"Fruits","Ягоды":"Berries","Зелень":"Greens & herbs","Цветы":"Flowers","Грибы":"Mushrooms","Суккуленты":"Succulents",
+  "Злаки и бобовые":"Grains & legumes","Деревья":"Trees","Прочее":"Other","Микрозелень":"Microgreens","Хищные":"Carnivorous",
+
+  // встроенные пресеты
+  "Базилик":"Basil","Салат":"Lettuce","Томат (рассада)":"Tomato (seedlings)","Перец":"Pepper","Клубника":"Strawberry","Манго":"Mango",
+  "Суккуленты и кактусы":"Succulents & cacti","Орхидея (фаленопсис)":"Orchid (Phalaenopsis)","Базилик Генуэзский":"Genovese basil",
+  "Горох, редис, подсолнечник, руккола. Урожай на 8–12 день":"Pea, radish, sunflower, arugula. Harvest on day 8–12",
+  "Любит тепло и много света, не терпит переувлажнения":"Likes warmth and lots of light, dislikes waterlogging","Прохлада и ровная влажность, при жаре стрелкуется":"Cool, even humidity; bolts in heat",
+  "Длинный день, тепло, умеренный полив":"Long day, warmth, moderate watering","Теплолюбивый, не любит перепадов температуры":"Warmth-loving, dislikes temperature swings",
+  "Умеренное тепло, влажность выше средней":"Moderate warmth, above-average humidity","Тропик: жарко и влажно, 12-часовой день":"Tropical: hot and humid, 12-hour day",
+  "Сухо, тепло, редкий полив":"Dry, warm, rare watering","Высокая влажность, рассеянный свет":"High humidity, diffused light","Мой сорт, после пикировки":"My variety, after pricking out",
+  "Прорастание в темноте":"Germination in darkness","Рост на свету":"Growth in light","Вегетация":"Vegetative","Рост":"Growth","Рассада":"Seedlings",
+
+  // справочник: растения
+  "Руккола":"Arugula","Шпинат":"Spinach","Петрушка":"Parsley","Укроп":"Dill","Кинза":"Cilantro","Мята":"Mint","Мелисса":"Lemon balm","Лук на перо":"Green onion",
+  "Шнитт-лук":"Chives","Розмарин":"Rosemary","Тимьян":"Thyme","Орегано":"Oregano","Кресс-салат":"Garden cress","Мизуна":"Mizuna","Пак-чой":"Pak choi","Мангольд":"Swiss chard",
+  "Кале":"Kale","Подсолнечник (микрозелень)":"Sunflower (microgreens)","Горох (побеги)":"Pea shoots","Редис (микрозелень)":"Radish (microgreens)","Брокколи (микрозелень)":"Broccoli (microgreens)",
+  "Пшеница на ростки":"Wheatgrass","Огурец":"Cucumber","Томат черри":"Cherry tomato","Баклажан":"Eggplant","Перец сладкий":"Sweet pepper","Перец острый":"Hot pepper",
+  "Редис":"Radish","Морковь мини":"Baby carrot","Фасоль":"Beans","Горох":"Peas","Имбирь":"Ginger","Земляника ремонтантная":"Everbearing strawberry","Голубика":"Blueberry",
+  "Лимон":"Lemon","Мандарин":"Mandarin","Ананас":"Pineapple","Авокадо":"Avocado","Банан карликовый":"Dwarf banana","Инжир":"Fig","Кофейное дерево":"Coffee plant",
+  "Финиковая пальма":"Date palm","Фикус":"Ficus","Фиалка (сенполия)":"African violet","Лаванда":"Lavender","Петуния":"Petunia","Бархатцы":"Marigold","Пеларгония":"Pelargonium",
+  "Роза миниатюрная":"Miniature rose","Тюльпан (выгонка)":"Tulip (forcing)","Венерина мухоловка":"Venus flytrap","Росянка":"Sundew","Вёшенка":"Oyster mushroom","Шиитаке":"Shiitake",
+  "Алоэ":"Aloe","Эхеверия":"Echeveria","Литопс":"Lithops",
+  "Быстро стрелкуется при жаре выше 24 °C и длинном дне":"Bolts quickly above 24 °C and on long days","Любит прохладу и короткий день, в жару уходит в стрелку":"Likes cool short days, bolts in heat",
+  "Всходит долго, семена замачивать на сутки":"Slow to sprout, soak seeds for a day","Светолюбив, при недостатке света вытягивается":"Light-loving, stretches without enough light",
+  "На длинном дне быстро стрелкуется":"Bolts quickly on long days","Любит влагу, растёт быстро":"Likes moisture, grows fast","Семена мелкие, не заделывать глубоко":"Small seeds, do not sow deep",
+  "Луковицы ставить до половины в субстрат":"Set bulbs halfway into the substrate","Многолетник, после срезки отрастает":"Perennial, regrows after cutting",
+  "Не переносит переувлажнения корней":"Does not tolerate wet roots","Сухолюбив, поливать после просыхания верхнего слоя":"Prefers dry, water after the top layer dries",
+  "Семена на свету, не заделывать":"Seeds need light, do not cover","Урожай через 10–14 дней после посева":"Harvest 10–14 days after sowing",
+  "Японская листовая капуста, режут несколько раз":"Japanese leaf mustard, cut several times","Стрелкуется при жаре и длинном дне":"Bolts in heat and on long days",
+  "Листовая свёкла, неприхотлива":"Leaf beet, undemanding","Холодостойкая капуста, вкуснее при прохладе":"Cold-hardy cabbage, tastier when cool",
+  "Первые 3 дня под грузом в темноте, срез на 8–10 день":"First 3 days weighted in darkness, cut on day 8–10","Замочка 8–12 часов, срез на 10–14 день":"Soak 8–12 hours, cut on day 10–14",
+  "Срез на 7–10 день, корневые волоски не путать с плесенью":"Cut on day 7–10; do not mistake root hairs for mould","Срез на 8–12 день":"Cut on day 8–12",
+  "Витграсс, срез на 8–10 день":"Wheatgrass, cut on day 8–10","Не выносит холода и сквозняков, нужна опора":"Hates cold and drafts, needs support",
+  "Опыление встряхиванием цветков, нужна опора":"Pollinate by shaking the flowers, needs support","Теплолюбив, плохо переносит пересадку":"Warmth-loving, transplants poorly",
+  "Не любит перепадов температуры":"Dislikes temperature swings","Прорастает медленно, нужен нагрев":"Germinates slowly, needs heat",
+  "Короткий день, иначе уходит в ботву и стрелку":"Short day, otherwise grows leaves and bolts","Нужна глубина субстрата от 15 см":"Needs at least 15 cm of substrate",
+  "Кустовые сорта удобнее для бокса":"Bush varieties suit the box better","Нужна опора, любит прохладу":"Needs support, likes cool conditions",
+  "Клубень проращивать в тепле и темноте":"Sprout the rhizome warm and dark","Опылять цветки кисточкой":"Pollinate the flowers with a brush","Нужен кислый субстрат pH 4–5":"Needs acidic substrate pH 4–5",
+  "Зимой лучше прохлада 12–15 °C":"Prefers 12–15 °C in winter","Не любит пересыхания и сквозняков":"Dislikes drying out and drafts","Выращивают из верхушки плода":"Grown from the fruit top",
+  "Косточку проращивают наполовину в воде":"Sprout the pit half-submerged in water","Нужны тепло, влажность и много воды":"Needs warmth, humidity and lots of water","Зимой период покоя":"Rests in winter",
+  "Рассеянный свет, не пересушивать":"Diffused light, do not let it dry out","Косточка прорастает 1–3 месяца в тепле":"The pit sprouts in 1–3 months when warm",
+  "Не любит перестановок и холода":"Dislikes being moved and cold","Не мочить листья, рассеянный свет":"Keep leaves dry, diffused light","Семенам нужна холодная стратификация":"Seeds need cold stratification",
+  "Семена сеют на свету, не заделывая":"Sow on the surface in light","Неприхотливы, отпугивают вредителей":"Undemanding, repel pests","Не любит переувлажнения":"Dislikes waterlogging",
+  "Обычно из черенков, нужна вентиляция от болезней":"Usually from cuttings, needs ventilation against disease","Луковицы после охлаждения 12–16 недель":"Bulbs after 12–16 weeks of chilling",
+  "Поливать только дистиллированной водой, зимой покой":"Water only with distilled water, rests in winter","Дистиллированная вода, высокая влажность":"Distilled water, high humidity",
+  "Инкубация в темноте, плодоношение при 85–95% и частом проветривании":"Incubate in darkness, fruit at 85–95% with frequent ventilation",
+  "Долгая инкубация блоков, для плодоношения нужен холодовой шок":"Long block incubation, cold shock needed to fruit","Поливать только после полного просыхания":"Water only after it dries out completely",
+  "Не допускать воды в розетке":"Keep water out of the rosette","Живые камни, полив только в период роста":"Living stones, water only during growth",
+  "свет":"light",
+
+  // демо-заметки
+  "Взошло около 90% семян, всходы ровные":"About 90% of the seeds sprouted, even growth","Подкормка комплексным удобрением, половина дозы":"Fed with a complete fertilizer, half dose",
+  "Посеял горох и редис, по 40 г семян, замочка 8 часов":"Sowed peas and radish, 40 g of seed each, soaked 8 hours","Горох проклюнулся, редис дружно взошёл":"Peas have cracked, radish came up evenly",
+  "На редисе белый пушок у корней — похоже на корневые волоски, не плесень. Наблюдаю":"White fuzz at the radish roots — looks like root hairs, not mould. Watching",
+  "Хороший урожай. В следующий раз поднять полив на прорастании":"Good harvest. Next time increase watering during germination","Микрозелень: проверить редис":"Microgreens: check the radish"
+};
+
+/* ---------- Шаблоны фраз с числами и названиями ---------- */
+const I18N_RX = [
+  [/^Полив (сегодня|завтра|через (\d+) дн) в (\d\d:\d\d) · (.+) мл$/, (m, w, n, t, v) => `Watering ${w === "сегодня" ? "today" : w === "завтра" ? "tomorrow" : "in " + n + " d"} at ${t} · ${v} ml`],
+  [/^Полив ([\d.]+) мл \((расписание|вручную|таймер)\)(?:, вес до полива (\d+) г)?$/, (m, v, s, w) => `Watered ${v} ml (${{"расписание":"scheduled","вручную":"manual","таймер":"timer"}[s]})${w ? `, weight before ${w} g` : ""}`],
+  [/^Полить сейчас (\d+) мл\?$/, "Water $1 ml now?"],
+  [/^Нагрев включён: ([\d.\-]+) °C ниже ([\d.\-]+) °C$/, "Heating on: $1 °C below $2 °C"],
+  [/^Нагрев выключен: ([\d.\-]+) °C.*$/, "Heating off: $1 °C"],
+  [/^Увлажнение включено: (\d+) % ниже (\d+) %$/, "Humidifying on: $1 % below $2 %"],
+  [/^Увлажнение выключено: (\d+) %$/, "Humidifying off: $1 %"],
+  [/^Проветривание включено: (.+)$/, (m, r) => `Ventilation on: ${trq(r)}`],
+  [/^День (\d+): начался этап «(.+)»$/, (m, d, s) => `Day ${d}: stage «${trq(s)}» started`],
+  [/^День (\d+): пресет изменён с «(.+)» на «(.+)»$/, (m, d, a, b) => `Day ${d}: preset changed from «${trq(a)}» to «${trq(b)}»`],
+  [/^Дверь открыта дольше (\d+) мин — закройте дверь$/, "The door has been open over $1 min — close it"],
+  [/^Модуль «(.+)» (на связи|снова на связи|не отвечает|запущен)$/, (m, n, s) => `Module «${trq(n)}» ${{"на связи":"is online","снова на связи":"is back online","не отвечает":"is not responding","запущен":"started"}[s]}`],
+  [/^Модуль «(.+)» не отвечает \((.+)\)$/, (m, n, a) => `Module «${trq(n)}» is not responding (${trq(a)})`],
+  [/^Модуль «(.+)»: аварийное отключение по перегреву$/, (m, n) => `Module «${trq(n)}»: emergency shutdown due to overheating`],
+  [/^«(.+)»: аварийное отключение, (?:в боксе )?([\d.]+) ?°C$/, (m, n, t) => `«${trq(n)}»: emergency shutdown, ${t} °C in the box`],
+  [/^«(.+)»: температура снизилась, нагрев снова разрешён$/, (m, n) => `«${trq(n)}»: temperature dropped, heating allowed again`],
+  [/^«(.+)» работал (\d+) мин подряд [-—] пауза(?: (\d+) мин)?$/, (m, n, a, b) => `«${trq(n)}» ran ${a} min in a row — pause${b ? " " + b + " min" : ""}`],
+  [/^«(.+)»: влажность (\d+) % [-—] аварийное отключение$/, (m, n, h) => `«${trq(n)}»: humidity ${h} % — emergency shutdown`],
+  [/^«(.+)»: нет воды для увлажнителя [-—] проверьте резервуар$/, (m, n) => `«${trq(n)}»: no water for the humidifier — check the tank`],
+  [/^Весы откалиброваны: коэффициент ([\d.\-]+) по грузу ([\d.]+) г$/, "Scale calibrated: factor $1 with a $2 g weight"],
+  [/^Калибровка: насос работал (\d+) с\. Измерьте объём и введите его на странице$/, "Calibration: the pump ran $1 s. Measure the volume and enter it on the page"],
+  [/^Начато выращивание «(.+)»$/, (m, n) => `Grow «${trq(n)}» started`],
+  [/^Выращивание «(.+)» запущено$/, (m, n) => `Grow «${trq(n)}» started`],
+  [/^Выращивание «(.+)» завершено: (\d+) (?:дн|дней)(?:, урожай (\d+) г)?$/, (m, n, d, g) => `Grow «${trq(n)}» finished: ${d} d${g ? ", harvest " + g + " g" : ""}`],
+  [/^Начать выращивание «(.+)»\? Этапы пойдут по дням с сегодняшнего, данные и заметки будут собираться в отдельную запись\.$/, (m, n) => `Start the grow «${trq(n)}»? Stages advance by day from today; data and notes are collected into a separate entry.`],
+  [/^Применить пресет «(.+)»\? Цели климата, полив и свет будут заменены\. Для плавного перехода используйте ••• → Адаптация\.$/, (m, n) => `Apply preset «${trq(n)}»? Climate targets, watering and light will be replaced. For a smooth transition use ••• → Adaptation.`],
+  [/^Сменить пресет на «(.+)» во время выращивания\? Этапы нового пресета продолжатся с дня (\d+), смена запишется в журнал\.$/, (m, n, d) => `Switch to preset «${trq(n)}» during the grow? The new preset's stages continue from day ${d}; the change is logged.`],
+  [/^Пресет «(.+)» применён$/, (m, n) => `Preset «${trq(n)}» applied`],
+  [/^Пресет «(.+)»$/, (m, n) => `Preset «${trq(n)}»`],
+  [/^Идёт выращивание «(.+)», день (\d+), этап «(.+)»\. Полив, свет и цели климата ниже относятся к этому этапу\.$/, (m, n, d, s) => `Grow «${trq(n)}» is running, day ${d}, stage «${trq(s)}». Watering, light and climate targets below apply to this stage.`],
+  [/^«(.+)», день (\d+)\. Итоги и все данные сохранятся в журнале\.$/, (m, n, d) => `«${trq(n)}», day ${d}. The results and all data are saved to the log.`],
+  [/^Идёт адаптация к «(.+)»: (\d+)%, осталось (.+)$/, (m, n, k, t) => `Adapting to «${trq(n)}»: ${k}%, ${trq(t)} left`],
+  [/^Идёт исследование «(.+)»: действуют параметры опыта ещё (.+)$/, (m, n, t) => `Research «${n}» running: experiment settings apply for another ${trq(t)}`],
+  [/^Начать «(.+)» на (.+)\? Бокс будет держать параметры опыта, затем вернётся к пресету\.$/, (m, n, t) => `Start «${n}» for ${trq(t)}? The box holds the experiment settings, then returns to the preset.`],
+  [/^Начато исследование «(.+)» на (.+)$/, (m, n, t) => `Research «${n}» started for ${trq(t)}`],
+  [/^Исследование «(.+)» (завершено|остановлено), результаты в разделе «Исследования»$/, (m, n, s) => `Research «${n}» ${s === "завершено" ? "finished" : "stopped"}, results in «Research»`],
+  [/^Начать плавный переход к «(.+)» за (.+)\?$/, (m, n, t) => `Start a smooth transition to «${trq(n)}» over ${trq(t)}?`],
+  [/^Начата адаптация к «(.+)» за (.+)$/, (m, n, t) => `Adaptation to «${trq(n)}» started over ${trq(t)}`],
+  [/^Авто: по сигналу бокса\. Греет при температуре ниже (.+) °C до (.+) °C\.$/, "Auto: by box signal. Heats when the temperature is below $1 °C, up to $2 °C."],
+  [/^Авто: по сигналу бокса\. Увлажняет при влажности ниже (.+)% до (.+)%\. Перед стартом насос подкачивает воду в бачок\.$/, "Auto: by box signal. Humidifies below $1% up to $2%. Before starting the pump refills the reservoir."],
+  [/^Авто: по сигналу бокса\. Проветривает при T > (.+) °C, влажности > (.+)% или CO₂ > (.+) ppm(?:, плюс каждые (\d+) мин на (\d+) мин по расписанию пресета)?\.$/,
+    (m, t, h, c, a, b) => `Auto: by box signal. Ventilates when T > ${t} °C, humidity > ${h}% or CO₂ > ${c} ppm${a ? `, plus every ${a} min for ${b} min on the preset schedule` : ""}.`],
+  [/^сигнал бокса: (.+)$/, (m, r) => `box signal: ${trq(r)}`],
+  [/^свои пороги: (греет до|увлажняет до) (.+)$/, (m, a, v) => `own thresholds: ${a === "греет до" ? "heating to" : "humidifying to"} ${v}`],
+  [/^свои пороги: (.+)$/, (m, r) => `own thresholds: ${trq(r)}`],
+  [/^работает: (.+)$/, (m, r) => `running: ${trq(r)}`],
+  [/^Нет связи (.+)\. Проверьте, стоит ли модуль на ленте питания\.$/, (m, a) => `No connection ${trq(a)}. Check that the module sits on the power rail.`],
+  [/^Бокс не на связи (.+)\. Проверьте питание и Wi-Fi\.$/, (m, a) => `The box is offline ${trq(a)}. Check power and Wi-Fi.`],
+  [/^Напоминание: (.+)$/, (m, r) => `Reminder: ${trq(r)}`],
+  [/^Время полива (\d+)$/, "Watering time $1"],
+  [/^Этап (\d+): (.+)$/, (m, n, r) => `Stage ${n}: ${trq(r)}`],
+  [/^(.+) дн при (.+) °C$/, "$1 d at $2 °C"],
+  [/^в этап (\d+)$/, "into stage $1"],
+  [/^Значения подставлены в этап (\d+)$/, "Values inserted into stage $1"],
+  [/^Сменить$/, "Change"]
+];
+
+/* ===== I18N END ===== */
 
 /* ===================== СПРАВОЧНИКИ ===================== */
 const st = (name, days, c, w, u) => ({name, days,
@@ -959,7 +1421,7 @@ const LIBRARY_PRESETS = PLANTS.map(plantToPreset);
 const MOD_TYPES = {
   humidifier:{icon:"💧", label:"Увлажнение", color:"var(--water-l)"},
   heater:{icon:"🔥", label:"Нагрев", color:"var(--heat-l)"},
-  fan:{icon:"🌀", label:"Вентиляция", color:"var(--green-l)"},
+  fan:{icon:"🌀", label:"Обдув", color:"var(--green-l)"},
   camera:{icon:"📷", label:"Камера", color:"var(--uv-l)"}
 };
 const ZONES = [
@@ -976,8 +1438,8 @@ const METRICS = [
   {id:"dew", label:"Точка росы", def:false}, {id:"light", label:"Основной свет", def:false}, {id:"wifi", label:"Wi-Fi", def:false}
 ];
 const CSV_METRICS = [
-  {id:"t", label:"Температура, °C"}, {id:"h", label:"Влажность, %"}, {id:"vpd", label:"VPD, кПа"},
-  {id:"co2", label:"CO₂, ppm"}, {id:"tvoc", label:"TVOC, ppb"}, {id:"w", label:"Вес, г"}, {id:"uv", label:"UV, %"}
+  {id:"t", label:tr("Температура, °C")}, {id:"h", label:tr("Влажность, %")}, {id:"vpd", label:tr("VPD, кПа")},
+  {id:"co2", label:tr("CO₂, ppm")}, {id:"tvoc", label:tr("TVOC, ppb")}, {id:"w", label:tr("Вес, г")}, {id:"uv", label:"UV, %"}
 ];
 
 /* ===================== ДЕМО: локальная база вместо Firebase ===================== */
@@ -1106,7 +1568,7 @@ function buildDemoData(){
   const micro = BUILTIN_PRESETS[0], basil = BUILTIN_PRESETS[1];
   const main = micro.stages[micro.stages.length - 1];
   const settings = {
-    version:now, presetId:micro.id, presetName:micro.name, presetIcon:micro.icon, presetLatin:"Mikrozelen",
+    version:now, presetId:micro.id, presetName:micro.name, presetIcon:micro.icon, presetLatin:"Микрозелень",
     climate:main.climate, watering:{...main.watering, flowMlPerSec:12.5}, uv:{...main.uv, mode:"auto"},
     moduleProfile:micro.modules, door:{warnMinutes:5}, timezoneMin:-new Date().getTimezoneOffset(),
     notify:{telegram:{enabled:false, token:"", chatId:"", notifyWatering:false}},
@@ -1130,15 +1592,15 @@ function buildDemoData(){
   const telemetry = {ts:now, t:last.t, h:last.h, co2:last.co2, tvoc:last.tvoc, co2Warm:false, weight:last.w,
     sensors:{bme:true, ccs:true, hx:true}, water:true, waterLevel:2870, pump1:"off", waterAlarm:false,
     pump2:false, pump2Ml:0, door:"closed", doorWarn:false, led:0, uv:last.uv, uvWanted:last.uv > 0,
-    timeValid:true, nextWaterMin:120, uptime:6 * 86400 + 5 * 3600, rssi:-58, ip:"192.168.1.47", fw:"3.1", modulesOnline:2,
+    timeValid:true, nextWaterMin:120, uptime:6 * 86400 + 5 * 3600, rssi:-58, ip:"192.168.1.47", fw:"3.6", modulesOnline:2,
     grow:{active:true, day:5, stage:1}};
   const modules = {
     "hum-A1B2C3":{info:{type:"humidifier", fw:"1.1", ip:"192.168.1.52"},
-      settings:{name:"Увлажнитель", mode:"auto", custom:{enabled:false, low:55, high:65}, safety:{maxRunMin:30, restMin:5}},
+      settings:{name:"Увлажнитель", mode:"auto", custom:{enabled:false, low:55, high:65}, safety:{maxRunMin:30, restMin:5, maxHum:92}, pump:{primeS:5, everyMin:10, forS:3}},
       state:{on:false, reason:"влажность в норме", lastSeen:now, rssi:-61, dataFresh:true, profileUse:true}},
     "fan-4F2E91":{info:{type:"fan", fw:"1.1", ip:"192.168.1.53"},
-      settings:{name:"Вентиляция", mode:"auto", custom:{enabled:false, tempMax:28, humMax:75, co2Max:1200}, fan:{speed:70, everyMin:60, forMin:5}},
-      state:{on:true, reason:"проветривание по расписанию", speed:60, lastSeen:now, rssi:-66, dataFresh:true, profileUse:true}},
+      settings:{name:"Обдув", mode:"auto", custom:{enabled:false, tempMax:28, humMax:75, co2Max:1200}, fan:{everyMin:60, forMin:5}},
+      state:{on:true, reason:"сигнал бокса: проветривание по расписанию", boxSignal:true, lastSeen:now, rssi:-66, dataFresh:true, profileUse:true}},
     "heat-7C1D05":{info:{type:"heater", fw:"1.1", ip:"192.168.1.54"},
       settings:{name:"Нагреватель", mode:"auto", custom:{enabled:false, low:20, high:23}, safety:{maxRunMin:60, restMin:5, maxTemp:35}},
       state:{on:false, reason:"не используется в текущем пресете", lastSeen:now - 3 * H, rssi:-72, dataFresh:true, profileUse:false}}
@@ -1238,6 +1700,12 @@ function vpdZone(v){
   return {txt:"слишком сухо", cls:"bad"};
 }
 const TR = {"а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ё":"e","ж":"zh","з":"z","и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f","х":"h","ц":"c","ч":"ch","ш":"sh","щ":"sch","ъ":"","ы":"y","ь":"","э":"e","ю":"yu","я":"ya"};
+// короткое имя для дисплея бокса: кириллица и латиница, без эмодзи
+function screenName(s, lang){
+  lang = lang || S.settings?.device?.displayLang || "ru";
+  if(lang === "en") s = I18N_EN[String(s).trim()] || translit(s);
+  return [...String(s)].filter(ch => /[\u0020-\u007e\u0400-\u045f]/.test(ch)).join("").replace(/\s+/g, " ").trim().slice(0, 20) || "Пресет";
+}
 function translit(s){
   return [...String(s)].map(ch => {
     const l = ch.toLowerCase(), t = TR[l];
@@ -1632,7 +2100,7 @@ function renderHero(){
   const uvTxt = uvMode === "on" ? "UV: всегда включена" : uvMode === "off" ? "UV: выключена"
     : e.uv.enabled === false ? "UV: тёмный этап" : `UV: ${e.uv.start}–${e.uv.end}, ${e.uv.brightness}%`;
   const right = `<div class="quick">
-      <div class="stack" style="gap:6px">${climatePill}<span class="pill info">${esc(water)}</span><span class="pill uv">${esc(uvTxt)}</span></div>
+      <div class="stack" style="gap:6px">${climatePill}<span class="pill info">${esc(water)}</span><span class="pill uv">${esc(uvTxt)}</span>${modSignalsPill()}</div>
       <div><label class="f" for="qWaterMl">Полить сейчас</label>
         <div class="qwater"><input type="number" id="qWaterMl" value="${e.watering.volumeMl || 100}" min="1" max="2000"><span class="muted">мл</span><button class="btn water sm" id="btnWaterNow">Полить</button></div></div>
       <div><label class="f">Лампа UV</label>
@@ -1653,6 +2121,12 @@ function renderHero(){
   hero.querySelectorAll("#uvSeg button").forEach(b => b.onclick = async () => {
     await saveSettings({"uv/mode": b.dataset.v}); toast("Режим UV: " + b.textContent);
   });
+}
+function modSignalsPill(){
+  const t = S.telemetry || {};
+  if(!isDeviceOnline()) return "";
+  const on = [t.heat && "нагрев", t.hum && "увлажнение", t.fan && "обдув"].filter(Boolean);
+  return on.length ? `<span class="pill warn">Модули включены: ${on.join(", ")}</span>` : `<span class="pill gray">Модули: нагрев, увлажнение и обдув не нужны</span>`;
 }
 function noteHtml(n){
   return `<div class="note"><div class="body">
@@ -1900,7 +2374,7 @@ function lineChart(id, from, to, datasets, yAxes){
       },
       scales:{
         x:{type:"linear", min:from, max:to, grid:{display:false},
-          title:{display:true, text:"Время"}, ticks:{maxTicksLimit:6, maxRotation:0, autoSkipPadding:14, callback:tickFmt()}},
+          title:{display:true, text:tr("Время")}, ticks:{maxTicksLimit:6, maxRotation:0, autoSkipPadding:14, callback:tickFmt()}},
         ...yAxes
       }
     },
@@ -1935,12 +2409,12 @@ async function loadCharts(){
   });
   Object.values(S.grows).forEach(g => {
     Object.values(g.notes || {}).forEach(n => chartMarkers.push({ts:n.ts, color:"#7e57c2"}));
-    chartMarkers.push({ts:g.startTs, color:"#2e7d32", line:true, label:"Старт: " + g.presetName});
-    if(g.endTs) chartMarkers.push({ts:g.endTs, color:"#2e7d32", line:true, label:"Финиш"});
+    chartMarkers.push({ts:g.startTs, color:"#2e7d32", line:true, label:tr("Старт: ") + tr(g.presetName)});
+    if(g.endTs) chartMarkers.push({ts:g.endTs, color:"#2e7d32", line:true, label:tr("Финиш")});
     (g.stages || []).forEach((s, i) => {
       if(i === 0) return;
       const ts = g.startTs + (stageStartDay(g.stages, i) - 1) * 86400000;
-      if(!g.endTs || ts < g.endTs) chartMarkers.push({ts, color:"#4caf50", line:true, label:s.name});
+      if(!g.endTs || ts < g.endTs) chartMarkers.push({ts, color:"#4caf50", line:true, label:tr(s.name)});
     });
   });
   chartMarkers.sort((a, b) => a.ts - b.ts);
@@ -1953,17 +2427,17 @@ const CHART_SPECS = {
   chClimate:data => ({datasets:[
     {label:"Температура, °C", data:cpts(data, "t"), borderColor:"#d9642f", yAxisID:"y"},
     {label:"Влажность, %", data:cpts(data, "h"), borderColor:"#2f86b8", yAxisID:"y1"}],
-    axes:{y:{grid:CGRID, position:"left", title:{display:true, text:"°C"}}, y1:{grid:{display:false}, position:"right", title:{display:true, text:"%"}}}}),
+    axes:{y:{grid:CGRID, position:"left", title:{display:true, text:tr("°C")}}, y1:{grid:{display:false}, position:"right", title:{display:true, text:tr("%")}}}}),
   chVpd:data => ({datasets:[
     {label:"VPD, кПа", data:data.filter(p => p.t !== undefined).map(p => ({x:p.ts, y:+vpd(p.t, p.h).toFixed(2)})), borderColor:"#3f7d4b", backgroundColor:"rgba(63,125,75,.10)", fill:true}],
-    axes:{y:{grid:CGRID, suggestedMin:0, title:{display:true, text:"кПа"}}}}),
+    axes:{y:{grid:CGRID, suggestedMin:0, title:{display:true, text:tr("кПа")}}}}),
   chAir:data => ({datasets:[
     {label:"CO₂, ppm", data:cpts(data, "co2"), borderColor:"#3f7d4b", yAxisID:"y"},
     {label:"TVOC, ppb", data:cpts(data, "tvoc"), borderColor:"#6a58a6", yAxisID:"y1"}],
-    axes:{y:{grid:CGRID, position:"left", title:{display:true, text:"ppm"}}, y1:{grid:{display:false}, position:"right", title:{display:true, text:"ppb"}}}}),
+    axes:{y:{grid:CGRID, position:"left", title:{display:true, text:tr("ppm")}}, y1:{grid:{display:false}, position:"right", title:{display:true, text:tr("ppb")}}}}),
   chWeight:data => ({datasets:[
     {label:"Вес, г", data:cpts(data, "w"), borderColor:"#8a5aa8", backgroundColor:"rgba(138,90,168,.07)", fill:true}],
-    axes:{y:{grid:CGRID, title:{display:true, text:"г"}}}})
+    axes:{y:{grid:CGRID, title:{display:true, text:tr("г")}}}})
 };
 document.querySelectorAll("#rangeSeg button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#rangeSeg button").forEach(x => x.classList.toggle("on", x === b));
@@ -2082,6 +2556,10 @@ function fillControlForm(force){
   $("cTgWater").checked = !!tg.notifyWatering;
   $("cDoorMin").value = s.door?.warnMinutes ?? 5;
   $("cTz").value = s.timezoneMin ?? 180;
+  $("cDispLang").value = s.device?.displayLang || "ru";
+  const dsp = s.device?.display || {};
+  $("cDispBright").value = dsp.bright ?? 100; $("cDispNight").value = dsp.nightBright ?? 20;
+  $("cDispSleep").value = dsp.sleepMin ?? 0; $("cDispNightDim").checked = dsp.nightDim ?? true;
   setDirty(false);
 }
 $("btnCtlReset").onclick = () => fillControlForm(true);
@@ -2097,6 +2575,10 @@ $("ctlForm").addEventListener("submit", async ev => {
   const patch = {
     "watering/flowMlPerSec":Math.max(0.1, +$("cFlow").value), "uv/mode":$("cUvMode").value,
     door:{warnMinutes:Math.max(1, Math.round(+$("cDoorMin").value))}, timezoneMin:+$("cTz").value,
+    "device/displayLang":$("cDispLang").value,
+    "device/display":{bright:Math.min(100, Math.max(5, Math.round(+$("cDispBright").value || 100))),
+      nightBright:Math.min(100, Math.max(0, Math.round(+$("cDispNight").value || 0))),
+      nightDim:$("cDispNightDim").checked, sleepMin:Math.min(240, Math.max(0, Math.round(+$("cDispSleep").value || 0)))}, presetLatin:screenName(S.settings.presetName || "", $("cDispLang").value),
     notify:{telegram:{enabled:$("cTgEnabled").checked, token:$("cTgToken").value.trim(), chatId:$("cTgChat").value.trim(), notifyWatering:$("cTgWater").checked}}
   };
   const e = effective();
@@ -2219,7 +2701,7 @@ async function applyPreset(p){
 async function applyPresetDirect(p){
   const g = activeGrow();
   const mainSt = p.stages[p.stages.length - 1];
-  const patch = {presetId:p.id, presetName:p.name, presetIcon:p.icon || "🌱", presetIconImg:p.iconImg || null, presetLatin:translit(p.name) || "Preset",
+  const patch = {presetId:p.id, presetName:p.name, presetIcon:p.icon || "🌱", presetIconImg:p.iconImg || null, presetLatin:screenName(p.name),
     climate:{...mainSt.climate}, "watering/times":mainSt.watering.times, "watering/everyDays":mainSt.watering.everyDays,
     "watering/volumeMl":mainSt.watering.volumeMl, "watering/enabled":mainSt.watering.enabled !== false,
     "uv/start":mainSt.uv.start, "uv/end":mainSt.uv.end, "uv/brightness":mainSt.uv.brightness, moduleProfile:p.modules};
@@ -2305,7 +2787,7 @@ function openPresetDlg(p, id){
   renderStageEditors(JSON.parse(JSON.stringify(n.stages)));
   const m = n.modules;
   $("pModHum").checked = !!m.humidifier?.use; $("pModHeat").checked = !!m.heater?.use; $("pModFan").checked = !!m.fan?.use;
-  $("pFanEvery").value = m.fan?.everyMin ?? 60; $("pFanFor").value = m.fan?.forMin ?? 5; $("pFanSpeed").value = m.fan?.speed ?? 70;
+  $("pFanEvery").value = m.fan?.everyMin ?? 60; $("pFanFor").value = m.fan?.forMin ?? 5;
   $("pFanFields").hidden = !$("pModFan").checked;
   $("pErr").textContent = "";
   $("refPanel").hidden = true;
@@ -2338,7 +2820,7 @@ $("pSave").onclick = async () => {
   }
   const p = {name, icon:draft.icon, iconImg:draft.iconImg || null, desc:$("pDesc").value.trim(), stages,
     modules:mods($("pModHum").checked, $("pModHeat").checked, $("pModFan").checked,
-      Math.max(0, Math.round(+$("pFanEvery").value)), Math.max(0, Math.round(+$("pFanFor").value)), Math.min(100, Math.max(0, Math.round(+$("pFanSpeed").value)))),
+      Math.max(0, Math.round(+$("pFanEvery").value)), Math.max(0, Math.round(+$("pFanFor").value))),
     updated:Date.now()};
   const ref = editingPresetId ? base.child("presets/" + editingPresetId) : base.child("presets").push();
   await ref.set(p);
@@ -2346,7 +2828,7 @@ $("pSave").onclick = async () => {
   toast("Пресет сохранён");
   if(editingPresetId && editingPresetId === S.settings.presetId){
     const mainSt = stages[stages.length - 1];
-    const patch = {presetName:p.name, presetIcon:p.icon, presetIconImg:p.iconImg, presetLatin:translit(p.name) || "Preset", climate:mainSt.climate,
+    const patch = {presetName:p.name, presetIcon:p.icon, presetIconImg:p.iconImg, presetLatin:screenName(p.name), climate:mainSt.climate,
       "watering/times":mainSt.watering.times, "watering/everyDays":mainSt.watering.everyDays, "watering/volumeMl":mainSt.watering.volumeMl,
       "uv/start":mainSt.uv.start, "uv/end":mainSt.uv.end, "uv/brightness":mainSt.uv.brightness, moduleProfile:p.modules};
     if(activeGrow()){ patch["grow/stages"] = stages; await base.child("grows/" + activeGrow().id).update({stages, presetName:p.name, icon:p.icon, iconImg:p.iconImg}); }
@@ -2383,10 +2865,10 @@ const moduleEngaged = m => { const prof = S.settings.moduleProfile?.[m.info?.typ
 function modAutoText(type){
   const c = effective().climate, prof = S.settings.moduleProfile?.[type];
   if(prof && !prof.use) return "Текущий пресет этот модуль не использует — в режиме «Авто» он выключен.";
-  if(type === "humidifier") return `Авто: включается ниже ${c.humMin ?? "?"}% и выключается на ${c.humMin !== undefined ? Math.round((c.humMin + c.humMax) / 2) : "?"}% (по пресету и этапу).`;
-  if(type === "heater") return `Авто: греет ниже ${c.tempMin ?? "?"} °C до ${c.tempMin !== undefined ? ((c.tempMin + c.tempMax) / 2).toFixed(1) : "?"} °C (по пресету и этапу).`;
-  if(type === "fan") return `Авто: включается при T > ${c.tempMax ?? "?"} °C, влажности > ${c.humMax ?? "?"}% или CO₂ > ${c.co2Max ?? "?"} ppm` +
-    (prof && prof.everyMin ? `, плюс проветривание каждые ${prof.everyMin} мин на ${prof.forMin} мин (из пресета).` : ".");
+  if(type === "humidifier") return `Авто: по сигналу бокса. Увлажняет при влажности ниже ${c.humMin ?? "?"}% до ${c.humMin !== undefined ? Math.round((c.humMin + c.humMax) / 2) : "?"}%. Перед стартом насос подкачивает воду в бачок.`;
+  if(type === "heater") return `Авто: по сигналу бокса. Греет при температуре ниже ${c.tempMin ?? "?"} °C до ${c.tempMin !== undefined ? ((c.tempMin + c.tempMax) / 2).toFixed(1) : "?"} °C.`;
+  if(type === "fan") return `Авто: по сигналу бокса. Проветривает при T > ${c.tempMax ?? "?"} °C, влажности > ${c.humMax ?? "?"}% или CO₂ > ${c.co2Max ?? "?"} ppm` +
+    (prof && prof.everyMin ? `, плюс каждые ${prof.everyMin} мин на ${prof.forMin} мин по расписанию пресета.` : ".");
   return "";
 }
 function modFormHtml(id, type){
@@ -2405,31 +2887,40 @@ function modFormHtml(id, type){
       <div><label class="f">Выключать при, ${u}</label><input type="number" step="0.5" name="high"></div>
       <div><label class="f">Макс. работа, мин</label><input type="number" name="maxRunMin" min="0"></div>
       <div><label class="f">Пауза, мин</label><input type="number" name="restMin" min="0"></div>
-      ${type === "heater" ? `<div><label class="f">Аварийный макс, °C</label><input type="number" step="0.5" name="maxTemp"></div>` : ""}</div>`;
+      ${type === "heater" ? `<div><label class="f">Аварийный макс, °C</label><input type="number" step="0.5" name="maxTemp"></div>`
+                          : `<div><label class="f">Аварийный макс, %</label><input type="number" name="maxHum"></div>`}</div>`;
+    if(type === "humidifier") spec += `<div class="subhead">Насос подкачки</div>
+      <div class="fields">
+        <div><label class="f">Перед стартом, с</label><input type="number" name="primeS" min="0" max="60"></div>
+        <div><label class="f">Подкачивать каждые, мин</label><input type="number" name="pumpEvery" min="0"></div>
+        <div><label class="f">На сколько, с</label><input type="number" name="pumpFor" min="0" max="60"></div>
+      </div>
+      <p class="small muted">Если в бачке стоит поплавок уровня, насос качает только когда воды мало, а эти времена не используются.</p>`;
   } else if(type === "fan"){
     spec = `<div class="fields">
       <div><label class="f">T макс, °C</label><input type="number" step="0.5" name="tempMax"></div>
       <div><label class="f">Влажн. макс, %</label><input type="number" name="humMax"></div>
       <div><label class="f">CO₂ макс, ppm</label><input type="number" step="50" name="co2Max"></div>
-      <div><label class="f">Скорость, %</label><input type="number" name="speed" min="0" max="100"></div>
       <div><label class="f">Проветривать каждые, мин</label><input type="number" name="everyMin" min="0"></div>
       <div><label class="f">На сколько, мин</label><input type="number" name="forMin" min="0"></div></div>
-      <p class="small muted">Скорость и проветривание из пресета имеют приоритет в режиме «Авто».</p>`;
+      <p class="small muted">Пороги и расписание здесь работают только при включённых «Своих порогах». В режиме «Авто» обдув следует сигналу бокса и расписанию пресета.</p>`;
   } else spec = `<p class="small muted">Настройки этого типа модуля появятся в следующей версии страницы.</p>`;
   return `<form class="mform" data-id="${esc(id)}">${common}${spec}
     <div class="row" style="margin-top:14px">
       <button type="submit" class="btn sm">Сохранить</button>
       <button type="button" class="btn light sm" data-test>Тест 10 с</button>
+      ${type === "humidifier" ? `<button type="button" class="btn light sm" data-pump>Подкачать 5 с</button>` : ""}
       <button type="button" class="btn danger sm" data-remove>Удалить</button>
     </div></form>`;
 }
 function fillModForm(form, m){
-  const s = m.settings || {}, c = s.custom || {}, sf = s.safety || {}, f = s.fan || {};
+  const s = m.settings || {}, c = s.custom || {}, sf = s.safety || {}, f = s.fan || {}, pm = s.pump || {};
   const set = (n, v) => { const el = form.elements[n]; if(!el) return; if(el.type === "checkbox") el.checked = !!v; else el.value = v ?? ""; };
   set("name", s.name); set("mode", s.mode || "auto"); set("customEnabled", c.enabled);
   set("low", c.low); set("high", c.high); set("maxRunMin", sf.maxRunMin); set("restMin", sf.restMin); set("maxTemp", sf.maxTemp);
   set("tempMax", c.tempMax); set("humMax", c.humMax); set("co2Max", c.co2Max);
-  set("speed", f.speed); set("everyMin", f.everyMin); set("forMin", f.forMin);
+  set("everyMin", f.everyMin); set("forMin", f.forMin);
+  set("maxHum", sf.maxHum); set("primeS", pm.primeS); set("pumpEvery", pm.everyMin); set("pumpFor", pm.forS);
 }
 function readModForm(form, type){
   const g = n => form.elements[n], nv = n => g(n) ? +g(n).value : undefined;
@@ -2438,9 +2929,13 @@ function readModForm(form, type){
     out.custom.low = nv("low"); out.custom.high = nv("high");
     out.safety = {maxRunMin:Math.max(0, Math.round(nv("maxRunMin"))), restMin:Math.max(0, Math.round(nv("restMin")))};
     if(type === "heater") out.safety.maxTemp = nv("maxTemp");
+    if(type === "humidifier"){
+      out.safety.maxHum = Math.min(99, Math.max(60, nv("maxHum") || 92));
+      out.pump = {primeS:Math.min(60, Math.max(0, Math.round(nv("primeS")))), everyMin:Math.max(0, Math.round(nv("pumpEvery"))), forS:Math.min(60, Math.max(0, Math.round(nv("pumpFor"))))};
+    }
   } else if(type === "fan"){
     out.custom.tempMax = nv("tempMax"); out.custom.humMax = nv("humMax"); out.custom.co2Max = nv("co2Max");
-    out.fan = {speed:Math.min(100, Math.max(0, Math.round(nv("speed")))), everyMin:Math.max(0, Math.round(nv("everyMin"))), forMin:Math.max(0, Math.round(nv("forMin")))};
+    out.fan = {everyMin:Math.max(0, Math.round(nv("everyMin"))), forMin:Math.max(0, Math.round(nv("forMin")))};
   }
   return out;
 }
@@ -2486,6 +2981,8 @@ function renderModules(){
         card.dirty = false; toast("Настройки модуля сохранены");
       });
       el.querySelector("[data-test]").onclick = async () => { await base.child("modules/" + id + "/command").set({test:10}); toast("Модуль включится на 10 секунд"); };
+      const pumpBtn = el.querySelector("[data-pump]");
+      if(pumpBtn) pumpBtn.onclick = async () => { await base.child("modules/" + id + "/command").set({pumpTest:5}); toast("Насос подкачает воду 5 секунд"); };
       el.querySelector("[data-remove]").onclick = async () => {
         if(!(await ask("Удалить модуль со страницы? Если он включён, то зарегистрируется снова с настройками по умолчанию.", "Удалить"))) return;
         await base.child("modules/" + id).remove(); toast("Модуль удалён");
@@ -2514,9 +3011,11 @@ function renderModulesLive(){
     const chips = [];
     if(onl) chips.push(`<span class="pill ${st.on ? "" : "gray"}">${st.on ? "Работает" : "Выключен"}</span>`);
     chips.push(`<span class="pill ${eng ? "uv" : "gray"}">${eng ? "Задействован в пресете" : "Не используется пресетом"}</span>`);
-    if(st.speed !== undefined && st.on) chips.push(`<span class="pill info">скорость ${st.speed}%</span>`);
+    if(onl && st.pump) chips.push(`<span class="pill info">Насос качает</span>`);
+    if(onl && st.waterLow) chips.push(`<span class="pill ${st.pumpLocked ? "bad" : "warn"}">${st.pumpLocked ? "Нет воды в резервуаре" : "Мало воды в бачке"}</span>`);
+    if(onl && st.boxSignal) chips.push(`<span class="pill">Сигнал бокса: вкл</span>`);
     if(st.resting) chips.push(`<span class="pill warn">пауза</span>`);
-    if(st.overheat) chips.push(`<span class="pill bad">перегрев</span>`);
+    if(st.overheat) chips.push(`<span class="pill bad">${m.info?.type === "humidifier" ? "слишком влажно" : "перегрев"}</span>`);
     if(onl && st.dataFresh === false) chips.push(`<span class="pill warn">нет данных бокса</span>`);
     card.el.querySelector("[data-state]").innerHTML = chips.join("");
     card.el.querySelector("[data-live]").innerHTML = onl
@@ -3091,7 +3590,7 @@ function renderDiag(){
 /* ===================== БИБЛИОТЕКА И СПРАВОЧНИК ===================== */
 function libraryMatches(q, cat){
   q = q.trim().toLowerCase();
-  return PLANTS.filter(p => (!cat || cat === "Все" || p.cat === cat) && (!q || p.alias.includes(q)));
+  return PLANTS.filter(p => (!cat || cat === "Все" || p.cat === cat) && (!q || p.alias.includes(q) || String(I18N_EN[p.name] || "").toLowerCase().includes(q)));
 }
 let libCat = "Все";
 function renderLibrary(){
@@ -3150,7 +3649,7 @@ function renderRef(){
     renderStageEditors(JSON.parse(JSON.stringify(pr.stages)));
     const m = pr.modules;
     $("pModHum").checked = m.humidifier.use; $("pModHeat").checked = m.heater.use; $("pModFan").checked = m.fan.use;
-    $("pFanEvery").value = m.fan.everyMin; $("pFanFor").value = m.fan.forMin; $("pFanSpeed").value = m.fan.speed;
+    $("pFanEvery").value = m.fan.everyMin; $("pFanFor").value = m.fan.forMin;
     $("pFanFields").hidden = !m.fan.use;
     toast("Пресет заполнен по справочнику");
   };
@@ -3190,6 +3689,8 @@ function openBigChart(id, title){
   const src = charts[id];
   if(src){ charts.chBig.options.scales.x.min = src.scales.x.min; charts.chBig.options.scales.x.max = src.scales.x.max; charts.chBig.update("none"); }
 }
+
+startI18n();
 
 /* ===================== ДЕМО-СИМУЛЯЦИЯ ===================== */
 function startDemo(){
