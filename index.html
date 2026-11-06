@@ -434,6 +434,26 @@ nav button.active{border-bottom-width:2px}
               <div><label class="f" for="cFlow">Насос, мл/с</label><input type="number" id="cFlow" min="0.1" step="0.1"></div>
             </div>
             <div class="sep"></div>
+            <label class="switch"><input type="checkbox" id="cByWeight"> Поливать по весу</label>
+            <div class="fields" style="margin-top:10px">
+              <div><label class="f" for="cDropG">Когда вес упал на, г</label><input type="number" id="cDropG" min="10" max="5000" step="10"></div>
+              <div><label class="f" for="cNeedGap">Не чаще раза в, мин</label><input type="number" id="cNeedGap" min="10" max="1440"></div>
+            </div>
+            <p class="muted small">Бокс запоминает вес через 2 минуты после полива. Когда растение «выпило» указанное количество граммов, он поливает объёмом, указанным выше. Работает вместе с расписанием или вместо него.</p>
+            <label class="switch"><input type="checkbox" id="cVerify"> Проверять полив весами</label>
+            <div class="fields" style="margin-top:10px">
+              <div><label class="f" for="cVerifyPct">Вес должен вырасти на, %</label><input type="number" id="cVerifyPct" min="10" max="100"></div>
+            </div>
+            <p class="muted small">Через 2 минуты после полива бокс сравнивает вес с весом до полива. Если вес почти не вырос, значит, вода не дошла (клапан, шланг, насос), и придёт предупреждение.</p>
+            <div class="sep"></div>
+            <h3 style="font-size:14px">Подкачка в увлажнитель</h3>
+            <div class="fields">
+              <div><label class="f" for="cPrimeMl">Перед включением, мл</label><input type="number" id="cPrimeMl" min="0" max="1000" step="10"></div>
+              <div><label class="f" for="cPrimeGap">Не чаще раза в, мин</label><input type="number" id="cPrimeGap" min="0" max="240"></div>
+            </div>
+            <p class="muted small">Перед каждым включением увлажнителя реле клапанов на боксе переключается на клапан увлажнителя, и насос модуля полива подаёт этот объём. 0 — не подкачивать.</p>
+            <button type="button" class="btn light sm" id="btnPrimeNow">Подкачать сейчас</button>
+            <div class="sep"></div>
             <h3 style="font-size:14px">Калибровка насоса</h3>
             <p class="muted small" style="margin-top:0">Поставьте мерный стакан под выход полива, нажмите «Налить 10 с», затем введите, сколько налилось. Производительность рассчитается и сохранится.</p>
             <div class="row">
@@ -494,7 +514,6 @@ nav button.active{border-bottom-width:2px}
             <div class="fields">
               <div><label class="f" for="cDoorMin">Предупреждение о двери, мин</label><input type="number" id="cDoorMin" min="1" max="120"></div>
               <div><label class="f" for="cTz">Часовой пояс</label><select id="cTz"></select></div>
-              <div><label class="f" for="cDispLang">Язык дисплея бокса</label><select id="cDispLang"><option value="ru">Русский</option><option value="en">English</option></select></div>
             </div>
             <div class="sep"></div>
             <h3 style="font-size:14px">Подсветка дисплея</h3>
@@ -876,7 +895,17 @@ function startI18n(){
   document.documentElement.lang = LANG;
   document.querySelectorAll("#langSeg button").forEach(b => {
     b.classList.toggle("on", b.dataset.l === LANG);
-    b.onclick = () => { if(b.dataset.l === LANG) return; try { localStorage.setItem("gb.lang", b.dataset.l); } catch(e){} location.reload(); };
+    b.onclick = async () => {
+      if(b.dataset.l === LANG) return;
+      try { localStorage.setItem("gb.lang", b.dataset.l); } catch(e){}
+      // тот же язык - на дисплее бокса
+      try {
+        if(typeof saveSettings === "function" && S.settings) await Promise.race([
+          saveSettings({"device/displayLang":b.dataset.l, presetLatin:screenName(S.settings.presetName || "", b.dataset.l)}),
+          new Promise(r => setTimeout(r, 3000))]);
+      } catch(e){}
+      location.reload();
+    };
   });
   if(LANG !== "en") return;
   trNode(document.body);
@@ -1118,6 +1147,39 @@ const I18N_EN = {
 
   "Подсветка дисплея":"Display backlight","Яркость днём, %":"Day brightness, %","Яркость ночью, %":"Night brightness, %","Гасить через, мин":"Turn off after, min",
   "Приглушать ночью":"Dim at night","Ночь — время, когда лампа по расписанию выключена. «Гасить через» 0 — экран не гаснет. Открытие двери и тревоги сразу включают экран на полную яркость.":"Night is when the lamp is off by schedule. «Turn off after» 0 keeps the screen on. Opening the door or an alarm turns the screen back on at full brightness.",
+  // полив через модуль, клапаны, подкачка, ESP-NOW
+  "Поливать по весу":"Water by weight","Когда вес упал на, г":"When weight dropped by, g","Не чаще раза в, мин":"At most once per, min",
+  "Бокс запоминает вес через 2 минуты после полива. Когда растение «выпило» указанное количество граммов, он поливает объёмом, указанным выше. Работает вместе с расписанием или вместо него.":"The box remembers the weight 2 minutes after watering. When the plant has «drunk» the given number of grams, it waters with the volume above. Works together with the schedule or instead of it.",
+  "Проверять полив весами":"Verify watering with the scale","Вес должен вырасти на, %":"Weight must rise by, %",
+  "Через 2 минуты после полива бокс сравнивает вес с весом до полива. Если вес почти не вырос, значит, вода не дошла (клапан, шланг, насос), и придёт предупреждение.":"2 minutes after watering the box compares the weight with the weight before. If it barely rose, the water did not arrive (valve, hose, pump) and you get a warning.",
+  "Подкачка в увлажнитель":"Water to humidifier","Перед включением, мл":"Before switching on, ml",
+  "Перед каждым включением увлажнителя реле клапанов на боксе переключается на клапан увлажнителя, и насос модуля полива подаёт этот объём. 0 — не подкачивать.":"Before each humidifier start the valve relay on the box switches to the humidifier valve and the watering module pump delivers this volume. 0 — no refill.",
+  "Подкачать сейчас":"Refill now","Подкачать":"Refill","Долил":"Refilled","Долил воду":"Tank refilled","Тест насоса 5 с":"Pump test 5 s",
+  "Бак":"Tank","Объём бака, мл":"Tank volume, ml","Ниже датчика, мл":"Below the sensor, ml","Не качать при остатке, мл":"Stop pumping below, ml","Порог датчика":"Sensor threshold",
+  "Датчик стоит внизу бака, поэтому остаток — оценка: модуль считает, сколько накачал. «Ниже датчика» — сколько воды остаётся в баке, когда датчик уже на воздухе. Когда датчик снова в воде, счётчик сбрасывается сам.":"The sensor sits at the bottom of the tank, so the remaining amount is an estimate: the module counts what it pumped. «Below the sensor» is how much water stays in the tank when the sensor is already dry. When the sensor is wet again, the counter resets by itself.",
+  "Насос включается только по команде бокса: полив растений по расписанию или по весу и подкачка воды в увлажнитель. Куда идёт вода, выбирает реле клапанов на боксе.":"The pump runs only on a box command: watering plants by schedule or by weight and refilling the humidifier. The valve relay on the box chooses where the water goes.",
+  "Объём подкачки воды задаётся в «Управление» → «Полив».":"The refill volume is set in «Control» → «Watering».",
+  "Бак полива снова наполнен":"Watering tank refilled","Бак полива пуст: насос заблокирован, полив невозможен":"Watering tank is empty: pump locked, watering impossible",
+  "Бак полива пуст: насос заблокирован — долейте воду":"Watering tank is empty: pump locked — refill water",
+  "Модуль полива не на связи (ESP-NOW)":"Watering module offline (ESP-NOW)","Модуль полива снова на связи (ESP-NOW)":"Watering module back online (ESP-NOW)",
+  "Модуль полива не на связи с боксом (ESP-NOW)":"Watering module has no link to the box (ESP-NOW)",
+  "Подкачка в увлажнитель пропущена: бак полива пуст":"Humidifier refill skipped: watering tank is empty",
+  "Подкачка в увлажнитель не начата: идёт полив или модуль полива не на связи":"Humidifier refill not started: watering in progress or watering module offline",
+  "Полив по весу":"Watering by weight","Нет связи":"No link","модуль полива не на связи":"watering module offline","модуль полива не подключён":"watering module not connected",
+  "Качает в увлажнитель":"Pumping to humidifier","Идёт полив":"Watering","Пусто":"Empty","Мало":"Low","Бак пуст":"Tank empty","Мало воды":"Low water","Вода есть":"Water OK",
+  "Нет воды в бачке увлажнителя":"No water in the humidifier reservoir","нет воды в бачке увлажнителя":"no water in the humidifier reservoir",
+  "Связь с боксом: ESP-NOW":"Link to box: ESP-NOW","Связь с боксом: через облако":"Link to box: via cloud",
+  "Насос включится на 5 секунд":"The pump runs for 5 seconds","Счётчик воды будет сброшен":"The water counter will be reset",
+  "Укажите объём от 1 до 1000 мл":"Enter a volume from 1 to 1000 ml","Бокс переключит клапан и подкачает воду":"The box switches the valve and refills water",
+  "Модуль полива не подключён":"Watering module not connected","Отметить, что бак полива долит до полного? Счётчик остатка воды сброшится.":"Mark the watering tank as full? The remaining-water counter will be reset.",
+  "Модуль полива (ESP-NOW)":"Watering module (ESP-NOW)","не подключён":"not connected","клапан увлажнителя":"humidifier valve","клапан полива":"watering valve",
+  "идёт подкачка в увлажнитель":"refilling the humidifier","идёт полив":"watering","Модули по ESP-NOW":"Modules via ESP-NOW","связь без интернета":"link without internet",
+  "Реле клапанов (GPIO13)":"Valve relay (GPIO13)","Датчик стоит внизу бака модуля полива.":"The sensor sits at the bottom of the watering module tank.",
+  "Модуль полива пока не подключён.":"The watering module is not connected yet.","в норме":"OK","Полив":"Watering",
+  "тест насоса":"pump test","качает в увлажнитель":"pumping to the humidifier","калибровка насоса":"pump calibration","полив растений":"watering plants",
+  "бак пуст - насос заблокирован":"tank empty — pump locked","мало воды - долейте":"low water — refill","ждёт команду бокса":"waiting for a box command","нет связи с боксом":"no link to the box",
+  "в баке полива нет воды":"no water in the watering tank","модуль полива не ответил":"the watering module did not answer","модуль полива перестал отвечать":"the watering module stopped answering",
+  "увлажнитель":"humidifier","калибровка":"calibration","по весу":"by weight",
   // диалоги
   "Загрузка…":"Loading…","Что получилось, что изменить в следующий раз":"What worked, what to change next time",
   "Да":"Yes","Удалить ":"Delete ",
@@ -1207,7 +1269,32 @@ const I18N_EN = {
 /* ---------- Шаблоны фраз с числами и названиями ---------- */
 const I18N_RX = [
   [/^Полив (сегодня|завтра|через (\d+) дн) в (\d\d:\d\d) · (.+) мл$/, (m, w, n, t, v) => `Watering ${w === "сегодня" ? "today" : w === "завтра" ? "tomorrow" : "in " + n + " d"} at ${t} · ${v} ml`],
-  [/^Полив ([\d.]+) мл \((расписание|вручную|таймер)\)(?:, вес до полива (\d+) г)?$/, (m, v, s, w) => `Watered ${v} ml (${{"расписание":"scheduled","вручную":"manual","таймер":"timer"}[s]})${w ? `, weight before ${w} g` : ""}`],
+  [/^Полив ([\d.]+) мл \((расписание|вручную|таймер|по весу)\)(?:, вес до полива (\d+) г)?$/, (m, v, s, w) => `Watered ${v} ml (${{"расписание":"scheduled","вручную":"manual","таймер":"timer","по весу":"by weight"}[s]})${w ? `, weight before ${w} g` : ""}`],
+  [/^Подкачка в увлажнитель:? (\d+) мл$/, "Humidifier refill: $1 ml"],
+  [/^Подкачка в увлажнитель не выполнена: (.+)$/, (m, w) => `Humidifier refill failed: ${trq(w)}`],
+  [/^Калибровка не выполнена: (.+)$/, (m, w) => `Calibration failed: ${trq(w)}`],
+  [/^Полив пропущен \((.+)\): модуль полива не на связи$/, (m, s) => `Watering skipped (${trq(s)}): watering module offline`],
+  [/^Полив пропущен \((.+)\): бак полива пуст, долейте воду$/, (m, s) => `Watering skipped (${trq(s)}): watering tank empty, refill water`],
+  [/^Полив не выполнен \((.+)\): (.+)$/, (m, s, w) => `Watering failed (${trq(s)}): ${trq(w)}`],
+  [/^Налито только (\d+) мл из (\d+): в баке полива кончилась вода$/, "Only $1 of $2 ml delivered: the watering tank ran dry"],
+  [/^Полив не подтверждён весами: \+?(-?\d+) г, ожидалось от (\d+) г\. Проверьте клапан, шланг и насос$/, "Watering not confirmed by the scale: +$1 g, expected at least $2 g. Check the valve, hose and pump"],
+  [/^Мало воды в баке полива: осталось около (\d+) мл — долейте воду$/, "Low water in the watering tank: about $1 ml left — refill"],
+  [/^Полив по весу: осталось (-?\d+) г$/, "Watering by weight: $1 g to go"],
+  [/^в баке ≈ (\d+) мл$/, "≈ $1 ml in tank"],
+  [/^в баке ≈ (\d+) мл, датчик (-?\d+)$/, "≈ $1 ml in tank, sensor $2"],
+  [/^в баке ≈ (\d+) мл, (бак пуст|мало воды), датчик (-?\d+)$/, (m, a, b, c) => `≈ ${a} ml in tank, ${b === "бак пуст" ? "tank empty" : "low water"}, sensor ${c}`],
+  [/^(Бак пуст|Мало воды|Вода есть) · ≈ (\S+) мл$/, (m, a, b) => `${{"Бак пуст":"Tank empty","Мало воды":"Low water","Вода есть":"Water OK"}[a]} · ≈ ${b} ml`],
+  [/^датчик (\S+) \/ порог (\S+)$/, "sensor $1 / threshold $2"],
+  [/^(\d+) на связи$/, "$1 online"],
+  [/^Подкачать (\d+) мл воды в увлажнитель\?$/, "Refill the humidifier with $1 ml of water?"],
+  [/^Подкачка в увлажнитель (\d+) мл$/, "Refilling the humidifier $1 ml"],
+  [/^Авто: по сигналу бокса\. Увлажняет при влажности ниже (.+)% до (.+)%\.(?: Перед включением бокс подкачивает в бачок (\d+) мл воды через клапан увлажнителя\.)?$/,
+    (m, a, b, c) => `Auto: by box signal. Humidifies below ${a}% up to ${b}%.` + (c ? ` Before switching on, the box refills the reservoir with ${c} ml through the humidifier valve.` : "")],
+  [/^«(.+)»: бак наполнен, счётчик воды сброшен$/, (m, n) => `«${trq(n)}»: tank refilled, water counter reset`],
+  [/^«(.+)»: вода кончилась во время полива, насос остановлен$/, (m, n) => `«${trq(n)}»: water ran out during watering, pump stopped`],
+  [/^«(.+)»: бак пуст, команда полива отклонена [-—] долейте воду$/, (m, n) => `«${trq(n)}»: tank empty, watering command refused — refill water`],
+  [/^«(.+)»: отмечено, что воду долили$/, (m, n) => `«${trq(n)}»: marked as refilled`],
+  [/^«(.+)»: нет воды для увлажнителя [-—] проверьте бачок$/, (m, n) => `«${trq(n)}»: no water for the humidifier — check the reservoir`],
   [/^Полить сейчас (\d+) мл\?$/, "Water $1 ml now?"],
   [/^Нагрев включён: ([\d.\-]+) °C ниже ([\d.\-]+) °C$/, "Heating on: $1 °C below $2 °C"],
   [/^Нагрев выключен: ([\d.\-]+) °C.*$/, "Heating off: $1 °C"],
@@ -1422,6 +1509,7 @@ const MOD_TYPES = {
   humidifier:{icon:"💧", label:"Увлажнение", color:"var(--water-l)"},
   heater:{icon:"🔥", label:"Нагрев", color:"var(--heat-l)"},
   fan:{icon:"🌀", label:"Обдув", color:"var(--green-l)"},
+  water:{icon:"🚿", label:"Полив", color:"var(--water-l)"},
   camera:{icon:"📷", label:"Камера", color:"var(--uv-l)"}
 };
 const ZONES = [
@@ -1561,15 +1649,16 @@ function buildDemoData(){
   ev(gStart + 3 * D - (gStart % D) + 60000, "info", "stage", "День 4: начался этап «Рост на свету»");
   ev(now - 2 * D - 25 * 60000, "alarm", "door", "Дверь открыта дольше 5 мин — закройте дверь");
   ev(now - 2 * D - 21 * 60000, "info", "door", "Дверь закрыта");
-  ev(now - 26 * H, "alarm", "water", "Нет воды: подключите резервуар или подачу воды");
-  ev(now - 25.6 * H, "info", "water", "Вода снова есть");
+  ev(now - 26 * H, "alarm", "water", "Мало воды в баке полива: осталось около 420 мл — долейте воду");
+  ev(now - 25.6 * H, "info", "water", "Бак полива снова наполнен");
+  ev(now - 7 * H, "info", "humprime", "Подкачка в увлажнитель: 100 мл");
   ev(now - 3 * H, "alarm", "module", "Модуль «Нагреватель» не отвечает");
 
   const micro = BUILTIN_PRESETS[0], basil = BUILTIN_PRESETS[1];
   const main = micro.stages[micro.stages.length - 1];
   const settings = {
     version:now, presetId:micro.id, presetName:micro.name, presetIcon:micro.icon, presetLatin:"Микрозелень",
-    climate:main.climate, watering:{...main.watering, flowMlPerSec:12.5}, uv:{...main.uv, mode:"auto"},
+    climate:main.climate, watering:{...main.watering, flowMlPerSec:12.5, humPrimeMl:100, humPrimeGapMin:10, verify:true, verifyPct:40, needGapMin:120}, uv:{...main.uv, mode:"auto"},
     moduleProfile:micro.modules, door:{warnMinutes:5}, timezoneMin:-new Date().getTimezoneOffset(),
     notify:{telegram:{enabled:false, token:"", chatId:"", notifyWatering:false}},
     grow:{active:true, id:"-Dgrow-micro", startTs:gStart, stages:micro.stages}
@@ -1590,18 +1679,24 @@ function buildDemoData(){
   const reminders = {"-Dn5":{at:now + 20 * H, text:"Микрозелень: проверить редис", growId:"-Dgrow-micro", noteId:"-Dn5"}};
   const last = history[Object.keys(history).sort().pop()];
   const telemetry = {ts:now, t:last.t, h:last.h, co2:last.co2, tvoc:last.tvoc, co2Warm:false, weight:last.w,
-    sensors:{bme:true, ccs:true, hx:true}, water:true, waterLevel:2870, pump1:"off", waterAlarm:false,
-    pump2:false, pump2Ml:0, door:"closed", doorWarn:false, led:0, uv:last.uv, uvWanted:last.uv > 0,
-    timeValid:true, nextWaterMin:120, uptime:6 * 86400 + 5 * 3600, rssi:-58, ip:"192.168.1.47", fw:"3.6", modulesOnline:2,
+    sensors:{bme:true, ccs:true, hx:true}, water:true, waterAlarm:false,
+    waterModule:{online:true, seen:true, low:false, empty:false, pump:false, remainMl:3150, level:2870},
+    pump2:false, pump2Ml:0, humPrime:false, humPriming:false, valve:"plants", espNow:4,
+    door:"closed", doorWarn:false, led:0, uv:last.uv, uvWanted:last.uv > 0,
+    timeValid:true, nextWaterMin:120, uptime:6 * 86400 + 5 * 3600, rssi:-58, ip:"192.168.1.47", fw:"4.0", modulesOnline:4,
     grow:{active:true, day:5, stage:1}};
   const modules = {
-    "hum-A1B2C3":{info:{type:"humidifier", fw:"1.1", ip:"192.168.1.52"},
-      settings:{name:"Увлажнитель", mode:"auto", custom:{enabled:false, low:55, high:65}, safety:{maxRunMin:30, restMin:5, maxHum:92}, pump:{primeS:5, everyMin:10, forS:3}},
-      state:{on:false, reason:"влажность в норме", lastSeen:now, rssi:-61, dataFresh:true, profileUse:true}},
-    "fan-4F2E91":{info:{type:"fan", fw:"1.1", ip:"192.168.1.53"},
+    "water-5B9E20":{info:{type:"water", fw:"3.0", ip:"192.168.1.55", link:"espnow"},
+      settings:{name:"Полив", tank:{volumeMl:5000, reserveMl:500, minMl:100, threshold:2000}},
+      state:{on:false, pump:false, wet:true, waterLow:false, empty:false, remainMl:3150, level:2870, threshold:2000, pumpedTotalMl:18400, pumpedSinceFullMl:1850,
+             reason:"ждёт команду бокса", link:"espnow", lastSeen:now, rssi:-59, dataFresh:true}},
+    "hum-A1B2C3":{info:{type:"humidifier", fw:"3.0", ip:"192.168.1.52", link:"espnow"},
+      settings:{name:"Увлажнитель", mode:"auto", custom:{enabled:false, low:55, high:65}, safety:{maxRunMin:30, restMin:5, maxHum:92}},
+      state:{on:false, reason:"сигнал бокса: влажность в норме", link:"espnow", lastSeen:now, rssi:-61, dataFresh:true, profileUse:true}},
+    "fan-4F2E91":{info:{type:"fan", fw:"3.0", ip:"192.168.1.53", link:"espnow"},
       settings:{name:"Обдув", mode:"auto", custom:{enabled:false, tempMax:28, humMax:75, co2Max:1200}, fan:{everyMin:60, forMin:5}},
-      state:{on:true, reason:"сигнал бокса: проветривание по расписанию", boxSignal:true, lastSeen:now, rssi:-66, dataFresh:true, profileUse:true}},
-    "heat-7C1D05":{info:{type:"heater", fw:"1.1", ip:"192.168.1.54"},
+      state:{on:true, reason:"сигнал бокса: проветривание по расписанию", boxSignal:true, link:"espnow", lastSeen:now, rssi:-66, dataFresh:true, profileUse:true}},
+    "heat-7C1D05":{info:{type:"heater", fw:"3.0", ip:"192.168.1.54", link:"espnow"},
       settings:{name:"Нагреватель", mode:"auto", custom:{enabled:false, low:20, high:23}, safety:{maxRunMin:60, restMin:5, maxTemp:35}},
       state:{on:false, reason:"не используется в текущем пресете", lastSeen:now - 3 * H, rssi:-72, dataFresh:true, profileUse:false}}
   };
@@ -1620,8 +1715,8 @@ function buildDemoData(){
       conclusion:"Расход воды вырос на 37%, при 26 °C нужно поднимать влажность или объём полива"}
   };
   const presetPrefs = {added:{lib_cucumber:now, lib_mint:now}, hidden:{}};
-  settings.device = {waterThreshold:2000};
-  telemetry.scaleFactor = -318.0; telemetry.waterThreshold = 2000;
+  settings.device = {displayLang:"ru"};
+  telemetry.scaleFactor = -318.0;
   return {devices:{[DEVICE_ID]:{settings, telemetry, history, historyHourly:hourly, events, modules, presets, grows, reminders, experiments, presetPrefs}}};
 }
 
@@ -2018,7 +2113,10 @@ function renderAlarms(){
   if(S.telemetry && !online) alarms.push(["bad", "Бокс не на связи " + ago(t.ts) + ". Проверьте питание и Wi-Fi."]);
   if(online){
     if(t.doorWarn) alarms.push(["bad", "Дверь открыта слишком долго — закройте дверь"]);
-    if(t.waterAlarm) alarms.push(["bad", "Нет воды: подключите резервуар или подачу воды"]);
+    const wm = t.waterModule || {};
+    if(wm.online && wm.empty) alarms.push(["bad", "Бак полива пуст: насос заблокирован — долейте воду"]);
+    else if(wm.online && wm.low) alarms.push(["bad", `Мало воды в баке полива: осталось около ${wm.remainMl} мл — долейте воду`]);
+    if(wm.seen && !wm.online) alarms.push(["warn", "Модуль полива не на связи с боксом (ESP-NOW)"]);
     const sn = t.sensors || {};
     if(sn.bme === false) alarms.push(["warn", "Ошибка датчика BME280 (температура, влажность)"]);
     if(sn.ccs === false) alarms.push(["warn", "Ошибка датчика CCS811 (CO₂, TVOC)"]);
@@ -2090,6 +2188,8 @@ function renderHero(){
     : probs.length ? `<span class="pill warn">Вне нормы: ${probs.join(", ")}</span>` : `<span class="pill">Условия в норме</span>`;
   let water = "—";
   if(t.pump2) water = "Идёт полив " + (t.pump2Ml ? t.pump2Ml + " мл" : "");
+  else if(t.humPrime) water = "Подкачка в увлажнитель " + (t.pump2Ml ? t.pump2Ml + " мл" : "");
+  else if(e.watering.enabled === false && e.watering.byWeight) water = online && t.needLeftG !== undefined ? `Полив по весу: осталось ${Math.max(0, t.needLeftG)} г` : "Полив по весу";
   else if(e.watering.enabled === false) water = "Полив выключен на этом этапе";
   else if(online && t.nextWaterMin >= 0){
     const at = nowMs() + t.nextWaterMin * 60000;
@@ -2179,7 +2279,11 @@ function renderMetrics(){
     co2:() => card("CO₂", val(t.co2, 0), "ppm", t.co2Warm ? "датчик прогревается" : `макс ${c.co2Max ?? "—"} ppm`, online && !t.co2Warm && t.co2 > c.co2Max ? "warn" : ""),
     tvoc:() => card("TVOC", val(t.tvoc, 0), "ppb", t.tvoc > 500 ? "повышено" : "летучие соединения"),
     weight:() => card("Вес", val(t.weight, 0), "г", "растение и субстрат"),
-    water:() => card("Вода", online ? (t.water ? "Есть" : t.pump1 === "on" ? "Долив" : "Нет") : "—", "", online ? "уровень датчика " + t.waterLevel : "", online && !t.water ? "bad" : "water"),
+    water:() => { const wm = t.waterModule || {};
+      if(!online) return card("Вода", "—", "", "", "water");
+      if(!wm.online) return card("Вода", wm.seen ? "Нет связи" : "—", "", wm.seen ? "модуль полива не на связи" : "модуль полива не подключён", wm.seen ? "bad" : "water");
+      const st = wm.pump ? (t.valve === "humidifier" ? "Качает в увлажнитель" : "Идёт полив") : wm.empty ? "Пусто" : wm.low ? "Мало" : "Есть";
+      return card("Вода", st, "", `в баке ≈ ${wm.remainMl} мл`, wm.empty || wm.low ? "bad" : "water"); },
     uv:() => card("UV-лампа", online ? t.uv : "—", "%", uvMode === "auto" ? (e.uv.enabled === false ? "тёмный этап" : "по расписанию") : uvMode === "on" ? "всегда вкл" : "выключена", "uv"),
     door:() => card("Дверь", online ? (t.door === "closed" ? "Закрыта" : "Открыта") : "—", "", online ? "основной свет " + t.led + "%" : "", t.doorWarn ? "bad" : ""),
     dew:() => card("Точка росы", online && t.t !== undefined ? num(dewPoint(t.t, t.h), 1) : "—", "°C", "конденсат ниже этой температуры"),
@@ -2543,6 +2647,10 @@ function fillControlForm(force){
   $("cVolume").value = w.volumeMl ?? 100;
   $("cEveryDays").value = w.everyDays ?? 1;
   $("cFlow").value = s.watering?.flowMlPerSec ?? 10;
+  $("cByWeight").checked = !!w.byWeight; $("cDropG").value = w.dropG ?? 150;
+  $("cNeedGap").value = s.watering?.needGapMin ?? 120;
+  $("cVerify").checked = s.watering?.verify ?? true; $("cVerifyPct").value = s.watering?.verifyPct ?? 40;
+  $("cPrimeMl").value = s.watering?.humPrimeMl ?? 100; $("cPrimeGap").value = s.watering?.humPrimeGapMin ?? 10;
   $("cUvMode").value = s.uv?.mode || "auto";
   $("cUvEnabled").checked = u.enabled !== false;
   $("cUvEnabled").closest("label").hidden = !e.grow;
@@ -2556,7 +2664,6 @@ function fillControlForm(force){
   $("cTgWater").checked = !!tg.notifyWatering;
   $("cDoorMin").value = s.door?.warnMinutes ?? 5;
   $("cTz").value = s.timezoneMin ?? 180;
-  $("cDispLang").value = s.device?.displayLang || "ru";
   const dsp = s.device?.display || {};
   $("cDispBright").value = dsp.bright ?? 100; $("cDispNight").value = dsp.nightBright ?? 20;
   $("cDispSleep").value = dsp.sleepMin ?? 0; $("cDispNightDim").checked = dsp.nightDim ?? true;
@@ -2570,15 +2677,20 @@ $("ctlForm").addEventListener("submit", async ev => {
   if(climate.tempMin >= climate.tempMax || climate.humMin >= climate.humMax) return toast("Минимум должен быть меньше максимума");
   if($("cWaterEnabled").checked && !times.length) return toast("Добавьте хотя бы одно время полива");
   const watering = {enabled:$("cWaterEnabled").checked, times:[...new Set(times)].sort(),
-    volumeMl:Math.max(1, Math.round(+$("cVolume").value)), everyDays:Math.min(14, Math.max(1, Math.round(+$("cEveryDays").value)))};
+    volumeMl:Math.max(1, Math.round(+$("cVolume").value)), everyDays:Math.min(14, Math.max(1, Math.round(+$("cEveryDays").value))),
+    byWeight:$("cByWeight").checked, dropG:Math.min(5000, Math.max(10, Math.round(+$("cDropG").value || 150)))};
   const uv = {enabled:$("cUvEnabled").checked, start:$("cUvStart").value, end:$("cUvEnd").value, brightness:Math.min(100, Math.max(0, Math.round(+$("cUvBright").value)))};
   const patch = {
     "watering/flowMlPerSec":Math.max(0.1, +$("cFlow").value), "uv/mode":$("cUvMode").value,
+    "watering/humPrimeMl":Math.min(1000, Math.max(0, Math.round(+$("cPrimeMl").value || 0))),
+    "watering/humPrimeGapMin":Math.min(240, Math.max(0, Math.round(+$("cPrimeGap").value || 0))),
+    "watering/verify":$("cVerify").checked, "watering/verifyPct":Math.min(100, Math.max(10, Math.round(+$("cVerifyPct").value || 40))),
+    "watering/needGapMin":Math.min(1440, Math.max(10, Math.round(+$("cNeedGap").value || 120))),
     door:{warnMinutes:Math.max(1, Math.round(+$("cDoorMin").value))}, timezoneMin:+$("cTz").value,
-    "device/displayLang":$("cDispLang").value,
+    "device/displayLang":LANG,
     "device/display":{bright:Math.min(100, Math.max(5, Math.round(+$("cDispBright").value || 100))),
       nightBright:Math.min(100, Math.max(0, Math.round(+$("cDispNight").value || 0))),
-      nightDim:$("cDispNightDim").checked, sleepMin:Math.min(240, Math.max(0, Math.round(+$("cDispSleep").value || 0)))}, presetLatin:screenName(S.settings.presetName || "", $("cDispLang").value),
+      nightDim:$("cDispNightDim").checked, sleepMin:Math.min(240, Math.max(0, Math.round(+$("cDispSleep").value || 0)))}, presetLatin:screenName(S.settings.presetName || "", LANG),
     notify:{telegram:{enabled:$("cTgEnabled").checked, token:$("cTgToken").value.trim(), chatId:$("cTgChat").value.trim(), notifyWatering:$("cTgWater").checked}}
   };
   const e = effective();
@@ -2597,6 +2709,12 @@ $("ctlForm").addEventListener("submit", async ev => {
   setDirty(false);
   toast("Настройки сохранены — бокс применит их в течение 5 секунд");
 });
+$("btnPrimeNow").onclick = async () => {
+  const ml = Math.round(+$("cPrimeMl").value || 100);
+  if(!(ml > 0 && ml <= 1000)) return toast("Укажите объём от 1 до 1000 мл");
+  if(!(await ask(`Подкачать ${ml} мл воды в увлажнитель?`, "Подкачать"))) return;
+  await sendCommand("humPrime", {ml, ts:Date.now()}); toast("Бокс переключит клапан и подкачает воду");
+};
 $("btnCalRun").onclick = async () => { await sendCommand("calibrate", {seconds:10, ts:Date.now()}); toast("Насос включится на 10 секунд"); };
 $("btnCalSave").onclick = async () => {
   const ml = +$("calMl").value;
@@ -2740,6 +2858,10 @@ function stageEditorHtml(s, i, n){
       <div><label class="f">Объём, мл</label><input type="number" min="1" max="2000" data-k="w.volumeMl" value="${w.volumeMl}"></div>
       <div><label class="f">Раз в N дней</label><input type="number" min="1" max="14" data-k="w.everyDays" value="${w.everyDays || 1}"></div>
     </div>
+    <label class="switch" style="margin-top:10px"><input type="checkbox" data-k="w.byWeight" ${w.byWeight ? "checked" : ""}> Поливать по весу</label>
+    <div class="fields" style="margin-top:10px">
+      <div><label class="f">Когда вес упал на, г</label><input type="number" min="10" max="5000" step="10" data-k="w.dropG" value="${w.dropG ?? 150}"></div>
+    </div>
     <div class="subhead">Свет (UV)</div>
     <label class="switch"><input type="checkbox" data-k="u.enabled" ${u.enabled !== false ? "checked" : ""}> Свет на этом этапе</label>
     <div class="fields" style="margin-top:10px">
@@ -2757,7 +2879,8 @@ function readStagesFromForm(){
       days:i === arr.length - 1 ? 365 : Math.max(1, Math.round(+g("days").value || 1)),
       climate:{tempMin:+g("c.tempMin").value, tempMax:+g("c.tempMax").value, humMin:+g("c.humMin").value, humMax:+g("c.humMax").value, co2Max:+g("c.co2Max").value},
       watering:{enabled:g("w.enabled").checked, times:g("w.times").value.split(/[,;\s]+/).filter(Boolean).map(normTime),
-        volumeMl:Math.round(+g("w.volumeMl").value), everyDays:Math.min(14, Math.max(1, Math.round(+g("w.everyDays").value || 1)))},
+        volumeMl:Math.round(+g("w.volumeMl").value), everyDays:Math.min(14, Math.max(1, Math.round(+g("w.everyDays").value || 1))),
+        byWeight:g("w.byWeight").checked, dropG:Math.min(5000, Math.max(10, Math.round(+g("w.dropG").value || 150)))},
       uv:{enabled:g("u.enabled").checked, start:g("u.start").value, end:g("u.end").value, brightness:Math.min(100, Math.max(0, Math.round(+g("u.brightness").value)))}
     };
   });
@@ -2861,11 +2984,14 @@ $("iconFile").onchange = async e => {
 /* ===================== МОДУЛИ ===================== */
 const modCards = {};
 function presetsUsing(type){ return allPresets().filter(p => p.modules?.[type]?.use).map(p => p.name); }
-const moduleEngaged = m => { const prof = S.settings.moduleProfile?.[m.info?.type]; return prof ? !!prof.use : true; };
+const moduleEngaged = m => { if(m.info?.type === "water") return true; const prof = S.settings.moduleProfile?.[m.info?.type]; return prof ? !!prof.use : true; };
 function modAutoText(type){
   const c = effective().climate, prof = S.settings.moduleProfile?.[type];
   if(prof && !prof.use) return "Текущий пресет этот модуль не использует — в режиме «Авто» он выключен.";
-  if(type === "humidifier") return `Авто: по сигналу бокса. Увлажняет при влажности ниже ${c.humMin ?? "?"}% до ${c.humMin !== undefined ? Math.round((c.humMin + c.humMax) / 2) : "?"}%. Перед стартом насос подкачивает воду в бачок.`;
+  if(type === "humidifier"){ const pm = S.settings.watering?.humPrimeMl ?? 100;
+    return `Авто: по сигналу бокса. Увлажняет при влажности ниже ${c.humMin ?? "?"}% до ${c.humMin !== undefined ? Math.round((c.humMin + c.humMax) / 2) : "?"}%.` +
+      (pm > 0 ? ` Перед включением бокс подкачивает в бачок ${pm} мл воды через клапан увлажнителя.` : ""); }
+  if(type === "water") return "Насос включается только по команде бокса: полив растений по расписанию или по весу и подкачка воды в увлажнитель. Куда идёт вода, выбирает реле клапанов на боксе.";
   if(type === "heater") return `Авто: по сигналу бокса. Греет при температуре ниже ${c.tempMin ?? "?"} °C до ${c.tempMin !== undefined ? ((c.tempMin + c.tempMax) / 2).toFixed(1) : "?"} °C.`;
   if(type === "fan") return `Авто: по сигналу бокса. Проветривает при T > ${c.tempMax ?? "?"} °C, влажности > ${c.humMax ?? "?"}% или CO₂ > ${c.co2Max ?? "?"} ppm` +
     (prof && prof.everyMin ? `, плюс каждые ${prof.everyMin} мин на ${prof.forMin} мин по расписанию пресета.` : ".");
@@ -2889,13 +3015,16 @@ function modFormHtml(id, type){
       <div><label class="f">Пауза, мин</label><input type="number" name="restMin" min="0"></div>
       ${type === "heater" ? `<div><label class="f">Аварийный макс, °C</label><input type="number" step="0.5" name="maxTemp"></div>`
                           : `<div><label class="f">Аварийный макс, %</label><input type="number" name="maxHum"></div>`}</div>`;
-    if(type === "humidifier") spec += `<div class="subhead">Насос подкачки</div>
+    if(type === "humidifier") spec += `<p class="small muted">Объём подкачки воды задаётся в «Управление» → «Полив».</p>`;
+  } else if(type === "water"){
+    spec = `<div class="subhead">Бак</div>
       <div class="fields">
-        <div><label class="f">Перед стартом, с</label><input type="number" name="primeS" min="0" max="60"></div>
-        <div><label class="f">Подкачивать каждые, мин</label><input type="number" name="pumpEvery" min="0"></div>
-        <div><label class="f">На сколько, с</label><input type="number" name="pumpFor" min="0" max="60"></div>
+        <div><label class="f">Объём бака, мл</label><input type="number" name="tankMl" min="100" step="100"></div>
+        <div><label class="f">Ниже датчика, мл</label><input type="number" name="reserveMl" min="0" step="50"></div>
+        <div><label class="f">Не качать при остатке, мл</label><input type="number" name="minMl" min="0" step="10"></div>
+        <div><label class="f">Порог датчика</label><input type="number" name="threshold" min="100" max="4000"></div>
       </div>
-      <p class="small muted">Если в бачке стоит поплавок уровня, насос качает только когда воды мало, а эти времена не используются.</p>`;
+      <p class="small muted">Датчик стоит внизу бака, поэтому остаток — оценка: модуль считает, сколько накачал. «Ниже датчика» — сколько воды остаётся в баке, когда датчик уже на воздухе. Когда датчик снова в воде, счётчик сбрасывается сам.</p>`;
   } else if(type === "fan"){
     spec = `<div class="fields">
       <div><label class="f">T макс, °C</label><input type="number" step="0.5" name="tempMax"></div>
@@ -2905,34 +3034,36 @@ function modFormHtml(id, type){
       <div><label class="f">На сколько, мин</label><input type="number" name="forMin" min="0"></div></div>
       <p class="small muted">Пороги и расписание здесь работают только при включённых «Своих порогах». В режиме «Авто» обдув следует сигналу бокса и расписанию пресета.</p>`;
   } else spec = `<p class="small muted">Настройки этого типа модуля появятся в следующей версии страницы.</p>`;
-  return `<form class="mform" data-id="${esc(id)}">${common}${spec}
+  const head = type === "water" ? `<div class="fields" style="grid-template-columns:1fr"><div><label class="f">Название</label><input type="text" name="name" maxlength="40"></div></div><p class="small muted" data-auto></p>` : common;
+  return `<form class="mform" data-id="${esc(id)}">${head}${spec}
     <div class="row" style="margin-top:14px">
       <button type="submit" class="btn sm">Сохранить</button>
-      <button type="button" class="btn light sm" data-test>Тест 10 с</button>
-      ${type === "humidifier" ? `<button type="button" class="btn light sm" data-pump>Подкачать 5 с</button>` : ""}
+      <button type="button" class="btn light sm" data-test>${type === "water" ? "Тест насоса 5 с" : "Тест 10 с"}</button>
+      ${type === "water" ? `<button type="button" class="btn light sm" data-refill>Долил воду</button>` : ""}
       <button type="button" class="btn danger sm" data-remove>Удалить</button>
     </div></form>`;
 }
 function fillModForm(form, m){
-  const s = m.settings || {}, c = s.custom || {}, sf = s.safety || {}, f = s.fan || {}, pm = s.pump || {};
+  const s = m.settings || {}, c = s.custom || {}, sf = s.safety || {}, f = s.fan || {};
   const set = (n, v) => { const el = form.elements[n]; if(!el) return; if(el.type === "checkbox") el.checked = !!v; else el.value = v ?? ""; };
   set("name", s.name); set("mode", s.mode || "auto"); set("customEnabled", c.enabled);
   set("low", c.low); set("high", c.high); set("maxRunMin", sf.maxRunMin); set("restMin", sf.restMin); set("maxTemp", sf.maxTemp);
   set("tempMax", c.tempMax); set("humMax", c.humMax); set("co2Max", c.co2Max);
   set("everyMin", f.everyMin); set("forMin", f.forMin);
-  set("maxHum", sf.maxHum); set("primeS", pm.primeS); set("pumpEvery", pm.everyMin); set("pumpFor", pm.forS);
+  set("maxHum", sf.maxHum);
+  const tk = s.tank || {};
+  set("tankMl", tk.volumeMl ?? 5000); set("reserveMl", tk.reserveMl ?? 500); set("minMl", tk.minMl ?? 100); set("threshold", tk.threshold ?? 2000);
 }
 function readModForm(form, type){
   const g = n => form.elements[n], nv = n => g(n) ? +g(n).value : undefined;
+  if(type === "water") return {name:g("name").value.trim() || "Полив", tank:{volumeMl:Math.max(100, Math.round(nv("tankMl") || 5000)),
+    reserveMl:Math.max(0, Math.round(nv("reserveMl") || 0)), minMl:Math.max(0, Math.round(nv("minMl") || 0)), threshold:Math.min(4000, Math.max(100, Math.round(nv("threshold") || 2000)))}};
   const out = {name:g("name").value.trim() || "Модуль", mode:g("mode").value, custom:{enabled:g("customEnabled").checked}};
   if(type === "humidifier" || type === "heater"){
     out.custom.low = nv("low"); out.custom.high = nv("high");
     out.safety = {maxRunMin:Math.max(0, Math.round(nv("maxRunMin"))), restMin:Math.max(0, Math.round(nv("restMin")))};
     if(type === "heater") out.safety.maxTemp = nv("maxTemp");
-    if(type === "humidifier"){
-      out.safety.maxHum = Math.min(99, Math.max(60, nv("maxHum") || 92));
-      out.pump = {primeS:Math.min(60, Math.max(0, Math.round(nv("primeS")))), everyMin:Math.max(0, Math.round(nv("pumpEvery"))), forS:Math.min(60, Math.max(0, Math.round(nv("pumpFor"))))};
-    }
+    if(type === "humidifier") out.safety.maxHum = Math.min(99, Math.max(60, nv("maxHum") || 92));
   } else if(type === "fan"){
     out.custom.tempMax = nv("tempMax"); out.custom.humMax = nv("humMax"); out.custom.co2Max = nv("co2Max");
     out.fan = {everyMin:Math.max(0, Math.round(nv("everyMin"))), forMin:Math.max(0, Math.round(nv("forMin")))};
@@ -2980,9 +3111,13 @@ function renderModules(){
         await base.child("modules/" + id + "/settings").update(readModForm(form, type));
         card.dirty = false; toast("Настройки модуля сохранены");
       });
-      el.querySelector("[data-test]").onclick = async () => { await base.child("modules/" + id + "/command").set({test:10}); toast("Модуль включится на 10 секунд"); };
-      const pumpBtn = el.querySelector("[data-pump]");
-      if(pumpBtn) pumpBtn.onclick = async () => { await base.child("modules/" + id + "/command").set({pumpTest:5}); toast("Насос подкачает воду 5 секунд"); };
+      el.querySelector("[data-test]").onclick = async () => {
+        if(type === "water"){ await base.child("modules/" + id + "/command").set({test:5}); toast("Насос включится на 5 секунд"); }
+        else { await base.child("modules/" + id + "/command").set({test:10}); toast("Модуль включится на 10 секунд"); } };
+      const refillBtn = el.querySelector("[data-refill]");
+      if(refillBtn) refillBtn.onclick = async () => {
+        if(!(await ask("Отметить, что бак полива долит до полного? Счётчик остатка воды сбросится.", "Долил"))) return;
+        await base.child("modules/" + id + "/command").set({refilled:true}); toast("Счётчик воды будет сброшен"); };
       el.querySelector("[data-remove]").onclick = async () => {
         if(!(await ask("Удалить модуль со страницы? Если он включён, то зарегистрируется снова с настройками по умолчанию.", "Удалить"))) return;
         await base.child("modules/" + id).remove(); toast("Модуль удалён");
@@ -3010,9 +3145,13 @@ function renderModulesLive(){
     on.className = "pill " + (onl ? "" : "bad"); on.textContent = onl ? "онлайн" : "офлайн";
     const chips = [];
     if(onl) chips.push(`<span class="pill ${st.on ? "" : "gray"}">${st.on ? "Работает" : "Выключен"}</span>`);
-    chips.push(`<span class="pill ${eng ? "uv" : "gray"}">${eng ? "Задействован в пресете" : "Не используется пресетом"}</span>`);
+    if(m.info?.type !== "water") chips.push(`<span class="pill ${eng ? "uv" : "gray"}">${eng ? "Задействован в пресете" : "Не используется пресетом"}</span>`);
     if(onl && st.pump) chips.push(`<span class="pill info">Насос качает</span>`);
-    if(onl && st.waterLow) chips.push(`<span class="pill ${st.pumpLocked ? "bad" : "warn"}">${st.pumpLocked ? "Нет воды в резервуаре" : "Мало воды в бачке"}</span>`);
+    if(onl && m.info?.type === "water"){
+      chips.push(`<span class="pill ${st.empty ? "bad" : st.waterLow ? "warn" : "info"}">${st.empty ? "Бак пуст" : st.waterLow ? "Мало воды" : "Вода есть"} · ≈ ${st.remainMl ?? "?"} мл</span>`);
+      chips.push(`<span class="pill gray">датчик ${st.level ?? "?"} / порог ${st.threshold ?? "?"}</span>`);
+    } else if(onl && st.waterLow) chips.push(`<span class="pill warn">Нет воды в бачке увлажнителя</span>`);
+    if(onl && st.link) chips.push(`<span class="pill ${st.link === "espnow" ? "" : "warn"}">${st.link === "espnow" ? "Связь с боксом: ESP-NOW" : "Связь с боксом: через облако"}</span>`);
     if(onl && st.boxSignal) chips.push(`<span class="pill">Сигнал бокса: вкл</span>`);
     if(st.resting) chips.push(`<span class="pill warn">пауза</span>`);
     if(st.overheat) chips.push(`<span class="pill bad">${m.info?.type === "humidifier" ? "слишком влажно" : "перегрев"}</span>`);
@@ -3528,14 +3667,19 @@ let waterDry = null, waterWet = null;
 function renderDiag(){
   const box = $("diagBody"); if(!box) return;
   const t = S.telemetry || {}, online = isDeviceOnline(), sn = t.sensors || {};
-  const mods = Object.values(S.modules), modsOn = mods.filter(isModuleOnline).length;
+  const mods = Object.values(S.modules), modsOn = mods.filter(isModuleOnline).length, wm = t.waterModule || {};
+  const wEntry = Object.entries(S.modules).find(([, m]) => m.info?.type === "water");
+  const wLevel = wEntry ? (wEntry[1].state?.level ?? wm.level) : wm.level, wThr = wEntry?.[1].settings?.tank?.threshold ?? 2000;
   const st = (ok, txt) => `<span class="pill ${ok === null ? "gray" : ok ? "" : "bad"}">${txt}</span>`;
   const rows = [
     ["Связь с боксом", st(online, online ? "онлайн" : "нет связи"), t.ts ? "данные " + ago(t.ts) : ""],
     ["BME280 (температура, влажность)", st(online ? sn.bme !== false : null, sn.bme === false ? "ошибка" : "в порядке"), online && t.t !== undefined ? `${num(t.t, 1)} °C, ${num(t.h, 1)} %` : ""],
     ["CCS811 (CO₂, TVOC)", st(online ? sn.ccs !== false : null, sn.ccs === false ? "ошибка" : t.co2Warm ? "прогрев" : "в порядке"), online && t.co2 !== undefined ? `${t.co2} ppm, ${t.tvoc} ppb` : ""],
     ["HX711 (весы)", st(online ? sn.hx !== false : null, sn.hx === false ? "ошибка" : "в порядке"), online && t.weight !== undefined ? `${num(t.weight, 0)} г, коэффициент ${t.scaleFactor ?? "?"}` : ""],
-    ["Датчик воды", st(online ? !!t.water : null, t.water ? "вода есть" : "воды нет"), online ? `уровень ${t.waterLevel}, порог ${t.waterThreshold ?? "?"}` : ""],
+    ["Модуль полива (ESP-NOW)", st(online ? !!wm.online : null, wm.online ? "на связи" : wm.seen ? "нет связи" : "не подключён"),
+      wm.online ? `в баке ≈ ${wm.remainMl} мл${wm.empty ? ", бак пуст" : wm.low ? ", мало воды" : ""}, датчик ${wm.level}` : ""],
+    ["Реле клапанов (GPIO13)", st(online ? true : null, t.valve === "humidifier" ? "клапан увлажнителя" : "клапан полива"), t.humPrime ? "идёт подкачка в увлажнитель" : t.pump2 ? "идёт полив" : ""],
+    ["Модули по ESP-NOW", st(online ? (t.espNow || 0) > 0 : null, online ? `${t.espNow || 0} на связи` : "—"), "связь без интернета"],
     ["Точное время", st(online ? t.timeValid !== false : null, t.timeValid === false ? "нет" : "получено"), ""],
     ["Wi-Fi", st(online ? t.rssi > -80 : null, online ? t.rssi + " дБм" : "—"), online ? (t.rssi > -60 ? "отличный сигнал" : t.rssi > -75 ? "нормальный" : "слабый") : ""],
     ["Модули", st(mods.length ? modsOn === mods.length : null, `${modsOn} из ${mods.length} на связи`), ""],
@@ -3543,7 +3687,7 @@ function renderDiag(){
   ];
   const live = `<div class="table-wrap"><table class="cmp" style="min-width:520px"><thead><tr><th>Узел</th><th>Состояние</th><th>Значение</th></tr></thead><tbody>
     ${rows.map(r => `<tr style="cursor:default"><td>${r[0]}</td><td>${r[1]}</td><td class="muted">${r[2]}</td></tr>`).join("")}</tbody></table></div>`;
-  if(box.dataset.rendered){ $("diagLive").innerHTML = live; $("wLevelNow").textContent = online ? t.waterLevel : "—"; return; }
+  if(box.dataset.rendered){ $("diagLive").innerHTML = live; if($("wLevelNow")) $("wLevelNow").textContent = wLevel ?? "—"; return; }
   box.innerHTML = `<div class="card" style="margin-bottom:14px"><h3>Состояние</h3><div id="diagLive">${live}</div></div>
     <div class="grid two">
       <div class="card"><h3>Калибровка весов</h3>
@@ -3555,13 +3699,14 @@ function renderDiag(){
         <p class="small muted">Коэффициент сохранится в памяти бокса. Результат появится в журнале.</p>
       </div>
       <div class="card"><h3>Порог датчика воды</h3>
-        <div class="kv"><span>Уровень сейчас</span><b class="num" id="wLevelNow">${online ? t.waterLevel : "—"}</b></div>
-        <div class="kv"><span>Порог сейчас</span><b class="num">${t.waterThreshold ?? S.settings.device?.waterThreshold ?? 2000}</b></div>
+        <p class="small muted" style="margin-top:0">Датчик стоит внизу бака модуля полива.${wEntry ? "" : " Модуль полива пока не подключён."}</p>
+        <div class="kv"><span>Уровень сейчас</span><b class="num" id="wLevelNow">${wLevel ?? "—"}</b></div>
+        <div class="kv"><span>Порог сейчас</span><b class="num">${wThr}</b></div>
         <div class="row" style="margin:10px 0">
           <button class="btn light sm" id="wDry">Запомнить: воды нет</button>
           <button class="btn light sm" id="wWet">Запомнить: вода есть</button>
         </div>
-        <div class="row"><input type="number" id="wThr" placeholder="порог" style="width:140px" value="${S.settings.device?.waterThreshold ?? 2000}"><button class="btn sm" id="wSave">Сохранить порог</button></div>
+        <div class="row"><input type="number" id="wThr" placeholder="порог" style="width:140px" value="${wThr}"><button class="btn sm" id="wSave">Сохранить порог</button></div>
         <p class="small muted" id="wHint">Снимите показания без воды и с водой — порог посчитается посередине.</p>
       </div>
     </div>`;
@@ -3578,12 +3723,15 @@ function renderDiag(){
       $("wHint").textContent = `Сухо: ${waterDry}, с водой: ${waterWet}. Порог ${$("wThr").value}.`;
     }
   };
-  $("wDry").onclick = () => { waterDry = S.telemetry?.waterLevel ?? null; toast("Запомнено: " + waterDry); calcThr(); };
-  $("wWet").onclick = () => { waterWet = S.telemetry?.waterLevel ?? null; toast("Запомнено: " + waterWet); calcThr(); };
+  const lvl = () => { const we = Object.entries(S.modules).find(([, m]) => m.info?.type === "water"); return we ? (we[1].state?.level ?? null) : (S.telemetry?.waterModule?.level ?? null); };
+  $("wDry").onclick = () => { waterDry = lvl(); toast("Запомнено: " + waterDry); calcThr(); };
+  $("wWet").onclick = () => { waterWet = lvl(); toast("Запомнено: " + waterWet); calcThr(); };
   $("wSave").onclick = async () => {
     const v = Math.round(+$("wThr").value);
     if(!(v >= 100 && v <= 4000)) return toast("Порог от 100 до 4000");
-    await saveSettings({"device/waterThreshold":v}); toast("Порог сохранён");
+    const we = Object.entries(S.modules).find(([, m]) => m.info?.type === "water");
+    if(!we) return toast("Модуль полива не подключён");
+    await base.child("modules/" + we[0] + "/settings/tank").update({threshold:v}); toast("Порог сохранён");
   };
 }
 
@@ -3722,12 +3870,23 @@ function startDemo(){
     const c = g("commands");
     if(c){
       Object.keys(c).forEach(k => r("commands/" + k).remove());
+      const wmod = () => g("telemetry").waterModule || {};
       if(c.waterNow){
         const ml = c.waterNow.ml, before = g("telemetry").weight;
-        r("telemetry").update({pump2:true, pump2Ml:ml});
+        r("telemetry").update({pump2:true, pump2Ml:ml, waterModule:{...wmod(), pump:true}});
         setTimeout(() => {
-          r("telemetry").update({pump2:false, pump2Ml:0, weight:+(before + ml).toFixed(1)});
+          const wm = wmod();
+          r("telemetry").update({pump2:false, pump2Ml:0, weight:+(before + ml).toFixed(1), waterModule:{...wm, pump:false, remainMl:Math.max(0, wm.remainMl - ml)}});
           ev("info", "watering", `Полив ${ml} мл (вручную), вес до полива ${Math.round(before)} г`, {ml, weight:before});
+        }, 4000);
+      }
+      if(c.humPrime){
+        const ml = c.humPrime.ml;
+        r("telemetry").update({humPrime:true, pump2Ml:ml, valve:"humidifier", waterModule:{...wmod(), pump:true}});
+        setTimeout(() => {
+          const wm = wmod();
+          r("telemetry").update({humPrime:false, pump2Ml:0, valve:"plants", waterModule:{...wm, pump:false, remainMl:Math.max(0, wm.remainMl - ml)}});
+          ev("info", "humprime", `Подкачка в увлажнитель: ${ml} мл`);
         }, 4000);
       }
       if(c.calibrate) setTimeout(() => ev("info", "calibration", `Калибровка: насос работал ${c.calibrate.seconds} с. Измерьте объём и введите его на странице`), 3000);
@@ -3737,6 +3896,12 @@ function startDemo(){
       if(c.reboot){ r("telemetry").update({uptime:0}); ev("info", "boot", "Перезагрузка по команде"); }
     }
     Object.entries(g("modules") || {}).forEach(([id, m]) => {
+      if(m.command && m.command.refilled){
+        r("modules/" + id + "/command").remove();
+        r("modules/" + id + "/state").update({remainMl:m.settings?.tank?.volumeMl || 5000, waterLow:false, empty:false, pumpedSinceFullMl:0});
+        r("telemetry").update({waterModule:{...(g("telemetry").waterModule || {}), remainMl:m.settings?.tank?.volumeMl || 5000, low:false, empty:false}});
+        ev("info", "module", `«${m.settings?.name || id}»: отмечено, что воду долили`);
+      }
       if(m.command && m.command.test){
         r("modules/" + id + "/command").remove();
         const prev = m.state || {};
@@ -3747,6 +3912,7 @@ function startDemo(){
     // модули в демо следуют профилю пресета
     const prof = (g("settings") || {}).moduleProfile || {};
     Object.entries(g("modules") || {}).forEach(([id, m]) => {
+      if(m.info?.type === "water") return;
       const use = prof[m.info?.type] ? !!prof[m.info.type].use : true;
       if(m.state && m.state.profileUse !== use && m.state.reason !== "тест")
         r("modules/" + id + "/state").update({profileUse:use, on:use ? m.state.on : false, reason:use ? "в норме" : "не используется в текущем пресете"});
