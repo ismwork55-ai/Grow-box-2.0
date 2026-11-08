@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Grow Box</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -306,9 +306,191 @@ nav button.active{border-bottom-width:2px}
 .lang-seg button{padding:5px 10px;font-size:12.5px}
 .view-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .view-head .back{border:1px solid var(--line2);background:var(--card);border-radius:10px;padding:6px 12px;cursor:pointer;font-weight:600;color:var(--muted)}
+
+/* =====================================================================
+   ДИЗАЙН «PRO»: боковое меню, нижняя панель на телефоне, светлая и тёмная тема
+   ===================================================================== */
+:root{
+  --bg:#f6f7f6; --card:#ffffff; --line:#e7e9e7; --line2:#d8dcd9; --text:#0f1713; --muted:#66716a; --soft:#f2f4f2;
+  --green:#15803d; --green-d:#166534; --green-l:#ecfdf3; --mint:#bbf7d0;
+  --water:#0284c7; --water-l:#e0f2fe; --uv:#7c3aed; --uv-l:#f3e8ff;
+  --warn:#b45309; --warn-l:#fffbeb; --danger:#dc2626; --danger-l:#fef2f2; --heat:#ea580c; --heat-l:#fff7ed;
+  --font:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius:12px; --shadow:0 1px 2px rgba(16,24,20,.04), 0 1px 1px rgba(16,24,20,.02);
+  --side:244px; --hdr-bg:rgba(255,255,255,.88); --input:#ffffff; --track:#e9ece9; --sw:#d4d9d5;
+  --pill-warn:#92400e; --pill-info:#075985; --primary-ink:#ffffff;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{--bg:#0b0f0d; --card:#121815; --line:#1f2823; --line2:#2b3631; --text:#e7ede9; --muted:#8d9a92; --soft:#171e1a;
+  --green:#4ade80; --green-d:#86efac; --green-l:#13261a; --mint:#1f4d2e;
+  --water:#38bdf8; --water-l:#0c2230; --uv:#a78bfa; --uv-l:#1e1833;
+  --warn:#fbbf24; --warn-l:#2a2010; --danger:#f87171; --danger-l:#2c1414; --heat:#fb923c; --heat-l:#2b1a0e;
+  --shadow:none; --hdr-bg:rgba(11,15,13,.86); --input:#0e1311; --track:#222c27; --sw:#33403a;
+  --pill-warn:#fbbf24; --pill-info:#7dd3fc; --primary-ink:#06210f; color-scheme:dark;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b0f0d; --card:#121815; --line:#1f2823; --line2:#2b3631; --text:#e7ede9; --muted:#8d9a92; --soft:#171e1a;
+  --green:#4ade80; --green-d:#86efac; --green-l:#13261a; --mint:#1f4d2e;
+  --water:#38bdf8; --water-l:#0c2230; --uv:#a78bfa; --uv-l:#1e1833;
+  --warn:#fbbf24; --warn-l:#2a2010; --danger:#f87171; --danger-l:#2c1414; --heat:#fb923c; --heat-l:#2b1a0e;
+  --shadow:none; --hdr-bg:rgba(11,15,13,.86); --input:#0e1311; --track:#222c27; --sw:#33403a;
+  --pill-warn:#fbbf24; --pill-info:#7dd3fc; --primary-ink:#06210f; color-scheme:dark;}}
+
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14.5px;-webkit-font-smoothing:antialiased}
+.num,.metric .val,.gstat .v,table.cmp td,.kv b{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"cv11" 1}
+h2{font-size:20px;font-weight:600;letter-spacing:-.015em}
+h3{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.muted{color:var(--muted)}
+
+/* ---------- шапка и навигация ---------- */
+header{background:var(--hdr-bg);border-bottom:1px solid var(--line);backdrop-filter:saturate(1.4) blur(10px)}
+.brand{font-weight:700;font-size:17px;letter-spacing:-.02em;color:var(--text);gap:9px}
+.leaf{width:22px;height:22px;border-radius:7px;transform:none;background:var(--green) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z'/%3E%3Cpath d='M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12'/%3E%3C/svg%3E") center/14px no-repeat}
+nav button{display:flex;align-items:center;gap:10px;font-weight:500;color:var(--muted)}
+nav button svg{width:18px;height:18px;flex:none}
+.nav-label{display:none}
+.chip{background:var(--card);border:1px solid var(--line);color:var(--text);font-weight:500;font-size:12.5px;padding:5px 10px}
+.chip .dot{color:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 18%,transparent)}
+.chip.off .dot{color:var(--danger);box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 18%,transparent)}
+.chip.gray .dot{color:var(--muted);box-shadow:none}
+#btnTheme svg{width:16px;height:16px}
+
+@media (min-width:1100px){
+  body{padding-left:var(--side)}
+  header{position:fixed;left:0;top:0;bottom:0;width:var(--side);border-bottom:0;border-right:1px solid var(--line);background:var(--card);
+    display:flex;flex-direction:column;overflow-y:auto;backdrop-filter:none;z-index:30}
+  .head-in{display:contents}
+  .brand-wrap{order:0;padding:20px 18px 14px}
+  #btnAppMenu{display:none}
+  nav{order:1;flex-direction:column;align-items:stretch;padding:4px 10px;margin:0;max-width:none;gap:1px;overflow:visible}
+  nav button{padding:8px 12px;border-radius:8px;border-bottom:0!important;font-size:14px;text-align:left}
+  nav button:hover{background:var(--soft);color:var(--text)}
+  nav button.active{background:var(--soft);color:var(--text);font-weight:600;box-shadow:inset 3px 0 0 var(--green)}
+  nav button.active svg{color:var(--green)}
+  .nav-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;padding:18px 12px 6px}
+  .chips{order:2;margin:auto 0 0;padding:14px 16px 18px;border-top:1px solid var(--line);flex-direction:column;align-items:stretch;gap:8px}
+  .chips .chip{justify-content:flex-start;white-space:normal}
+  .chips .side-row{display:flex;gap:8px;align-items:center}
+  main{max-width:1320px;padding:28px 36px 60px}
+}
+@media (max-width:1099.98px){
+  .nav-tool{display:none!important}
+  .chips .side-row{display:contents}
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:40;max-width:none;margin:0;background:var(--card);border-top:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(6,1fr);gap:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));overflow:visible}
+  nav button{flex-direction:column;gap:3px;padding:6px 2px;font-size:10.5px;border-bottom:0!important;border-radius:10px;min-width:0}
+  nav button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  nav button svg{width:21px;height:21px}
+  nav button.active{color:var(--green)}
+  main{padding:16px 16px calc(96px + env(safe-area-inset-bottom,0px))}
+  .savebar{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  #toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .head-in{padding:10px 16px;gap:8px}
+  header{backdrop-filter:none;background:var(--card)}
+  .hero{grid-template-columns:minmax(0,1fr)!important}
+  .brand{font-size:16px}
+  .chips{gap:6px}
+  .chips .chip{font-size:12px;padding:4px 9px}
+}
+
+/* ---------- карточки ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.hero{background:var(--card)!important;gap:22px}
+.hero-title{font-size:24px;font-weight:650;letter-spacing:-.02em}
+.pico{background:var(--soft);border:1px solid var(--line);border-radius:12px}
+.section-title{margin:28px 0 12px}
+.section-title h3,.section-title h2{font-size:15px}
+.gstat{background:var(--soft);border:1px solid var(--line);border-radius:10px}
+.gstat .l{font-size:11px;letter-spacing:.06em;font-weight:600;color:var(--muted)}
+.gstat .v{font-size:18px;font-weight:600}
+.quick{background:var(--soft);border:1px solid var(--line);border-radius:12px}
+.stage{border-radius:7px;font-weight:500;background:var(--soft);border-color:var(--line);color:var(--muted)}
+.stage.now{background:var(--text);border-color:var(--text);color:var(--card)}
+.stage.done{background:var(--green-l);border-color:var(--mint);color:var(--green-d)}
+.note{background:var(--card);border-color:var(--line);border-radius:10px}
+
+/* ---------- показатели ---------- */
+.metrics{grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:12px}
+.metric{padding:16px 16px 12px;border-left:1px solid var(--line)!important;display:flex;flex-direction:column}
+.metric .lbl{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;color:var(--muted)}
+.m-ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:var(--soft);color:var(--text);flex:none}
+.m-ic svg{width:15px;height:15px}
+.m-temp{color:var(--heat);background:var(--heat-l)} .m-hum,.m-dew,.m-water{color:var(--water);background:var(--water-l)}
+.m-vpd,.m-weight{color:var(--green);background:var(--green-l)} .m-uv,.m-tvoc{color:var(--uv);background:var(--uv-l)}
+.m-co2,.m-door,.m-light,.m-wifi{color:var(--muted);background:var(--soft)}
+.metric .val{font-size:30px;font-weight:600;letter-spacing:-.025em;margin:12px 0 2px;line-height:1.05}
+.metric .val small{font-size:13px;font-weight:500;color:var(--muted);margin-left:4px;letter-spacing:0}
+.metric .sub{font-size:12.5px;color:var(--muted)}
+.metric.warn,.metric.bad,.metric.water,.metric.uv{background:var(--card)!important}
+.metric.warn{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 45%,transparent)}
+.metric.warn .val{color:var(--warn)}
+.metric.bad{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--danger) 45%,transparent)}
+.metric.bad .val{color:var(--danger)}
+.spark{display:block;width:100%;height:34px;margin-top:10px;overflow:visible}
+.range{height:5px;background:var(--track);margin-top:10px}
+.range .band{background:color-mix(in srgb,var(--green) 28%,transparent)}
+.range .mark{background:var(--text);width:3px;height:13px;top:-4px}
+.range .mark.out{background:var(--danger)}
+
+/* ---------- кнопки и поля ---------- */
+.btn{border-radius:8px;font-weight:500;font-size:13.5px;padding:9px 14px;background:var(--green);color:var(--primary-ink);box-shadow:0 1px 1px rgba(0,0,0,.06)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:8px}
+.btn.light,.btn.ghost,.btn.uv{background:var(--card)!important;color:var(--text)!important;border:1px solid var(--line2)!important;box-shadow:none}
+.btn.light:hover,.btn.ghost:hover,.btn.uv:hover{background:var(--soft)!important}
+.btn.danger{background:var(--card)!important;color:var(--danger)!important;border:1px solid color-mix(in srgb,var(--danger) 35%,transparent)!important}
+.btn.water{background:var(--water)!important;color:#fff!important}
+.icon-btn{border-radius:8px;border-color:var(--line2);background:var(--card);color:var(--muted)}
+input[type=text],input[type=number],input[type=time],input[type=date],input[type=datetime-local],input[type=email],input[type=password],select,textarea{
+  border-radius:8px;background:var(--input);border-color:var(--line2);color:var(--text)}
+input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 18%,transparent)}
+label.f{font-weight:500;font-size:12.5px}
+.seg{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:2px}
+.seg button{border-radius:7px;font-weight:500;padding:6px 11px}
+.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.switch{font-weight:500}
+.switch input{background:var(--sw)}
+.switch input:checked{background:var(--green)}
+
+/* ---------- метки и тревоги ---------- */
+.pill{font-weight:500;border-radius:999px;background:var(--green-l);color:var(--green-d);gap:6px}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.85}
+.pill.warn{background:var(--warn-l);color:var(--pill-warn)} .pill.bad{background:var(--danger-l);color:var(--danger)}
+.pill.info{background:var(--water-l);color:var(--pill-info)} .pill.uv{background:var(--uv-l);color:var(--uv)}
+.pill.gray{background:var(--soft);color:var(--muted)}
+.tag{background:var(--soft);color:var(--muted);border:1px solid var(--line);font-weight:500}
+.alarm{font-weight:500;border-radius:10px;border:1px solid;border-left-width:3px}
+.alarm.bad{background:var(--danger-l);color:var(--danger);border-color:color-mix(in srgb,var(--danger) 30%,transparent)}
+.alarm.warn{background:var(--warn-l);color:var(--pill-warn);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.alarm.info{background:var(--water-l);color:var(--pill-info);border-color:color-mix(in srgb,var(--water) 30%,transparent)}
+.demo-banner{background:var(--soft);color:var(--muted);border:1px solid var(--line);border-left:3px solid var(--uv);font-weight:400;border-radius:10px}
+.hint{background:var(--soft);color:var(--muted)}
+.menu{background:var(--card);border-color:var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14)}
+.menu .mi:hover,.menu .mi.cur{background:var(--soft)}
+dialog{background:var(--card);color:var(--text);border-radius:16px;border:1px solid var(--line)}
+.savebar{background:var(--text);color:var(--card);border-radius:12px}
+#toast{background:var(--text);color:var(--card);border-radius:10px;font-weight:500}
+table.cmp th{color:var(--muted);border-bottom-color:var(--line2)}
+table.cmp td{border-bottom-color:var(--line)}
+table.cmp tbody tr:hover{background:var(--soft)}
+.ev{border-bottom-color:var(--line)}
+.kv{border-bottom-color:var(--line)}
+.view-head .back{background:var(--card);border-color:var(--line2);color:var(--muted);border-radius:8px}
+.lang-seg button{padding:4px 9px;font-size:12px}
+.ref-panel,.stage-edit{background:var(--soft);border-color:var(--line2)}
+.ref-item,.plant-info,.time-item input{background:var(--card)}
+.time-item{background:var(--water-l)}
+.icon-grid button,.cats button{background:var(--card);border-color:var(--line)}
+.ntag{background:var(--uv-l);color:var(--uv)}
+.ntag.problem{background:var(--danger-l);color:var(--danger)} .ntag.feed{background:var(--water-l);color:var(--pill-info)}
+.ntag.harvest{background:var(--green-l);color:var(--green-d)} .ntag.transplant{background:var(--warn-l);color:var(--pill-warn)}
+.login-card{background:var(--card);border:1px solid var(--line);border-radius:16px}
+#login{background:var(--bg)}
 </style>
 </head>
 <body>
+<script>
+  // тема: auto (как в системе) / light / dark
+  (function(){ try { var t = localStorage.getItem("gb.theme"); if(t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch(e){} })();
+</script>
 
 <!-- ================= ПОДКЛЮЧЕНИЕ ================= -->
 <div id="login">
@@ -337,16 +519,21 @@ nav button.active{border-bottom-width:2px}
       <div class="chips">
         <span id="chipDevice" class="chip gray"><span class="dot"></span>Бокс: ожидание</span>
         <span id="chipGrow" class="chip">—</span>
-        <div class="seg lang-seg" id="langSeg" data-noi18n><button data-l="ru">RU</button><button data-l="en">EN</button></div>
+        <div class="side-row"><button class="icon-btn sm" id="btnTheme" title="Тема: авто" aria-label="Тема"></button><div class="seg lang-seg" id="langSeg" data-noi18n><button data-l="ru">RU</button><button data-l="en">EN</button></div></div>
       </div>
     </div>
     <nav id="nav">
-      <button data-tab="overview" class="active">Обзор</button>
-      <button data-tab="charts">Графики</button>
-      <button data-tab="control">Управление</button>
-      <button data-tab="presets">Пресеты</button>
-      <button data-tab="modules">Модули</button>
-      <button data-tab="log">Журнал</button>
+      <button data-tab="overview" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Обзор</span></button>
+      <button data-tab="charts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg><span>Графики</span></button>
+      <button data-tab="control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span>Управление</span></button>
+      <button data-tab="presets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg><span>Пресеты</span></button>
+      <button data-tab="modules"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg><span>Модули</span></button>
+      <button data-tab="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Журнал</span></button>
+      <div class="nav-label nav-tool">Инструменты</div>
+      <button data-tab="research" class="nav-tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/></svg><span>Исследования</span></button>
+      <button data-tab="adapt" class="nav-tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg><span>Адаптация</span></button>
+      <button data-tab="calc" class="nav-tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/></svg><span>Калькуляторы</span></button>
+      <button data-tab="diag" class="nav-tool"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>Диагностика</span></button>
     </nav>
   </header>
 
@@ -477,10 +664,10 @@ nav button.active{border-bottom-width:2px}
             <div class="fields">
               <div><label class="f" for="cUvStart">Включение</label><input type="time" id="cUvStart"></div>
               <div><label class="f" for="cUvEnd">Выключение</label><input type="time" id="cUvEnd"></div>
-              <div><label class="f" for="cUvBright">Яркость, %</label><input type="number" id="cUvBright" min="0" max="100"></div>
+              <div style="display:none"><label class="f" for="cUvBright">Яркость, %</label><input type="number" id="cUvBright" min="0" max="100"></div>
             </div>
             <p class="muted small" id="uvHours"></p>
-            <p class="muted small">При открытой двери UV всегда плавно гаснет.</p>
+            <p class="muted small">Лампу включает реле модуля UV по сигналу бокса. При открытой двери бокс сразу выключает лампу. Яркость не используется: реле только включает и выключает лампу.</p>
           </div>
 
           <div class="card">
@@ -1180,6 +1367,19 @@ const I18N_EN = {
   "бак пуст - насос заблокирован":"tank empty — pump locked","мало воды - долейте":"low water — refill","ждёт команду бокса":"waiting for a box command","нет связи с боксом":"no link to the box",
   "в баке полива нет воды":"no water in the watering tank","модуль полива не ответил":"the watering module did not answer","модуль полива перестал отвечать":"the watering module stopped answering",
   "увлажнитель":"humidifier","калибровка":"calibration","по весу":"by weight",
+  "Тема: светлая":"Theme: light","Тема: тёмная":"Theme: dark","Тема: как в системе":"Theme: system","Тема: авто":"Theme: auto","Тема":"Theme",
+  "Диагностика":"Diagnostics",
+  "UV-лампа":"UV lamp","модуль UV не на связи":"UV module offline","модуль UV не подключён":"UV module not connected","дверь открыта":"door open",
+  "Модуль UV не на связи (ESP-NOW)":"UV module offline (ESP-NOW)","Модуль UV снова на связи (ESP-NOW)":"UV module back online (ESP-NOW)",
+  "Модуль UV (ESP-NOW)":"UV module (ESP-NOW)","лампа включена":"lamp on","лампа выключена":"lamp off","бокс: свет нужен":"box: light needed","бокс: свет не нужен":"box: light not needed",
+  "Дверь открыта — лампа выключена":"Door open — lamp off",
+  "Расписание света задаётся в пресете и в «Управление» → «UV-лампа». Реле только включает и выключает лампу, яркость не меняется.":"The light schedule is set in the preset and in «Control» → «UV lamp». The relay only switches the lamp on and off; brightness does not change.",
+  "Лампу включает реле модуля UV по сигналу бокса. При открытой двери бокс сразу выключает лампу. Яркость не используется: реле только включает и выключает лампу.":"The UV module relay switches the lamp on the box signal. With the door open the box turns the lamp off immediately. Brightness is not used: the relay only switches the lamp on and off.",
+  "Авто: общий режим UV на странице — «всегда включена». При открытой двери бокс сразу выключает лампу.":"Auto: the UV mode on the page is «always on». With the door open the box turns the lamp off immediately.",
+  "Авто: общий режим UV на странице — «выключена».":"Auto: the UV mode on the page is «off».",
+  "Авто: по сигналу бокса. Сейчас тёмный этап — лампа не включается.":"Auto: by box signal. This is a dark stage — the lamp stays off.",
+  "выключена вручную":"switched off manually","включена вручную":"switched on manually","дверь открыта - лампа выключена":"door open — lamp off",
+  "сигнал бокса: свет по расписанию":"box signal: scheduled light","сигнал бокса: свет не нужен":"box signal: light not needed",
   // диалоги
   "Загрузка…":"Loading…","Что получилось, что изменить в следующий раз":"What worked, what to change next time",
   "Да":"Yes","Удалить ":"Delete ",
@@ -1285,6 +1485,8 @@ const I18N_RX = [
   [/^в баке ≈ (\d+) мл, (бак пуст|мало воды), датчик (-?\d+)$/, (m, a, b, c) => `≈ ${a} ml in tank, ${b === "бак пуст" ? "tank empty" : "low water"}, sensor ${c}`],
   [/^(Бак пуст|Мало воды|Вода есть) · ≈ (\S+) мл$/, (m, a, b) => `${{"Бак пуст":"Tank empty","Мало воды":"Low water","Вода есть":"Water OK"}[a]} · ≈ ${b} ml`],
   [/^датчик (\S+) \/ порог (\S+)$/, "sensor $1 / threshold $2"],
+  [/^горела (\d+) мин с запуска$/, "on for $1 min since start"],
+  [/^Авто: по сигналу бокса\. Лампа горит с (\S+) до (\S+) по расписанию этапа\. При открытой двери бокс сразу выключает лампу\.$/, "Auto: by box signal. The lamp is on from $1 to $2 on the stage schedule. With the door open the box turns the lamp off immediately."],
   [/^(\d+) на связи$/, "$1 online"],
   [/^Подкачать (\d+) мл воды в увлажнитель\?$/, "Refill the humidifier with $1 ml of water?"],
   [/^Подкачка в увлажнитель (\d+) мл$/, "Refilling the humidifier $1 ml"],
@@ -1510,6 +1712,7 @@ const MOD_TYPES = {
   heater:{icon:"🔥", label:"Нагрев", color:"var(--heat-l)"},
   fan:{icon:"🌀", label:"Обдув", color:"var(--green-l)"},
   water:{icon:"🚿", label:"Полив", color:"var(--water-l)"},
+  uv:{icon:"💡", label:"UV-лампа", color:"var(--uv-l)"},
   camera:{icon:"📷", label:"Камера", color:"var(--uv-l)"}
 };
 const ZONES = [
@@ -1682,14 +1885,18 @@ function buildDemoData(){
     sensors:{bme:true, ccs:true, hx:true}, water:true, waterAlarm:false,
     waterModule:{online:true, seen:true, low:false, empty:false, pump:false, remainMl:3150, level:2870},
     pump2:false, pump2Ml:0, humPrime:false, humPriming:false, valve:"plants", espNow:4,
-    door:"closed", doorWarn:false, led:0, uv:last.uv, uvWanted:last.uv > 0,
-    timeValid:true, nextWaterMin:120, uptime:6 * 86400 + 5 * 3600, rssi:-58, ip:"192.168.1.47", fw:"4.0", modulesOnline:4,
+    door:"closed", doorWarn:false, led:0, uv:last.uv, uvWanted:last.uv > 0, uvSignal:last.uv > 0,
+    uvModule:{online:true, seen:true, on:last.uv > 0},
+    timeValid:true, nextWaterMin:120, uptime:6 * 86400 + 5 * 3600, rssi:-58, ip:"192.168.1.47", fw:"4.1", modulesOnline:5,
     grow:{active:true, day:5, stage:1}};
   const modules = {
     "water-5B9E20":{info:{type:"water", fw:"3.0", ip:"192.168.1.55", link:"espnow"},
       settings:{name:"Полив", tank:{volumeMl:5000, reserveMl:500, minMl:100, threshold:2000}},
       state:{on:false, pump:false, wet:true, waterLow:false, empty:false, remainMl:3150, level:2870, threshold:2000, pumpedTotalMl:18400, pumpedSinceFullMl:1850,
              reason:"ждёт команду бокса", link:"espnow", lastSeen:now, rssi:-59, dataFresh:true}},
+    "uv-3A71C4":{info:{type:"uv", fw:"3.0", ip:"192.168.1.56", link:"espnow"},
+      settings:{name:"UV-лампа", mode:"auto"},
+      state:{on:true, boxSignal:true, doorOpen:false, onMinutes:312, reason:"сигнал бокса: свет по расписанию", link:"espnow", lastSeen:now, rssi:-63, dataFresh:true}},
     "hum-A1B2C3":{info:{type:"humidifier", fw:"3.0", ip:"192.168.1.52", link:"espnow"},
       settings:{name:"Увлажнитель", mode:"auto", custom:{enabled:false, low:55, high:65}, safety:{maxRunMin:30, restMin:5, maxHum:92}},
       state:{on:false, reason:"сигнал бокса: влажность в норме", link:"espnow", lastSeen:now, rssi:-61, dataFresh:true, profileUse:true}},
@@ -1732,8 +1939,8 @@ if(DEMO){
 const base = db.ref("devices/" + DEVICE_ID);
 if(typeof Chart !== "undefined"){
   if(window.ChartZoom) Chart.register(window.ChartZoom);
-  Chart.defaults.font.family = "IBM Plex Sans, system-ui, sans-serif";
-  Chart.defaults.color = "#687e6e";
+  Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+  Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue("--muted").trim() || "#66716a";
 }
 
 const S = { telemetry:null, settings:{}, modules:{}, presets:{}, events:[], grows:{}, reminders:{},
@@ -2001,7 +2208,7 @@ async function loadEvents(from, to){
   snap.forEach(c => { const v = c.val(); if(v && v.ts >= from && v.ts <= (to || Infinity)) arr.push(v); });
   return arr;
 }
-async function loadHistory24(){ S.history24 = await loadRange(nowMs() - 24 * 3600000); renderWeight(); }
+async function loadHistory24(){ S.history24 = await loadRange(nowMs() - 24 * 3600000); renderWeight(); renderMetrics(); }
 async function refreshGrowData(){
   const g = activeGrow();
   if(!g){ S.growPts = []; S.growEvents = []; renderHero(); return; }
@@ -2198,7 +2405,7 @@ function renderHero(){
   }
   const uvMode = s.uv?.mode || "auto";
   const uvTxt = uvMode === "on" ? "UV: всегда включена" : uvMode === "off" ? "UV: выключена"
-    : e.uv.enabled === false ? "UV: тёмный этап" : `UV: ${e.uv.start}–${e.uv.end}, ${e.uv.brightness}%`;
+    : e.uv.enabled === false ? "UV: тёмный этап" : `UV: ${e.uv.start}–${e.uv.end}`;
   const right = `<div class="quick">
       <div class="stack" style="gap:6px">${climatePill}<span class="pill info">${esc(water)}</span><span class="pill uv">${esc(uvTxt)}</span>${modSignalsPill()}</div>
       <div><label class="f" for="qWaterMl">Полить сейчас</label>
@@ -2284,18 +2491,103 @@ function renderMetrics(){
       if(!wm.online) return card("Вода", wm.seen ? "Нет связи" : "—", "", wm.seen ? "модуль полива не на связи" : "модуль полива не подключён", wm.seen ? "bad" : "water");
       const st = wm.pump ? (t.valve === "humidifier" ? "Качает в увлажнитель" : "Идёт полив") : wm.empty ? "Пусто" : wm.low ? "Мало" : "Есть";
       return card("Вода", st, "", `в баке ≈ ${wm.remainMl} мл`, wm.empty || wm.low ? "bad" : "water"); },
-    uv:() => card("UV-лампа", online ? t.uv : "—", "%", uvMode === "auto" ? (e.uv.enabled === false ? "тёмный этап" : "по расписанию") : uvMode === "on" ? "всегда вкл" : "выключена", "uv"),
+    uv:() => { const um = t.uvModule || {}, modeTxt = uvMode === "auto" ? (e.uv.enabled === false ? "тёмный этап" : "по расписанию") : uvMode === "on" ? "всегда вкл" : "выключена";
+      if(!online) return card("UV-лампа", "—", "", "", "uv");
+      if(!um.online) return card("UV-лампа", um.seen ? "Нет связи" : "—", "", um.seen ? "модуль UV не на связи" : "модуль UV не подключён", um.seen ? "bad" : "uv");
+      return card("UV-лампа", um.on ? "Вкл" : "Выкл", "", t.door === "open" ? "дверь открыта" : modeTxt, "uv"); },
     door:() => card("Дверь", online ? (t.door === "closed" ? "Закрыта" : "Открыта") : "—", "", online ? "основной свет " + t.led + "%" : "", t.doorWarn ? "bad" : ""),
     dew:() => card("Точка росы", online && t.t !== undefined ? num(dewPoint(t.t, t.h), 1) : "—", "°C", "конденсат ниже этой температуры"),
     light:() => card("Основной свет", online ? t.led : "—", "%", "включается при открытой двери"),
     wifi:() => card("Wi-Fi", online ? t.rssi : "—", "дБм", online ? (t.rssi > -60 ? "отличный сигнал" : t.rssi > -75 ? "нормальный сигнал" : "слабый сигнал") : "")
   };
   const vis = visibleMetrics();
-  $("metrics").innerHTML = METRICS.filter(m => vis.includes(m.id)).map(m => defs[m.id]()).join("") ||
+  $("metrics").innerHTML = METRICS.filter(m => vis.includes(m.id)).map(m => metricDecor(m.id, defs[m.id]())).join("") ||
     `<div class="card empty">Все показатели скрыты. Нажмите ••• рядом с заголовком, чтобы выбрать.</div>`;
   const hidden = METRICS.length - vis.length;
   $("hiddenMetricsNote").textContent = hidden > 0 ? `Скрыто показателей: ${hidden}. Их можно включить через •••.` : "";
 }
+
+// ---- иконки и мини-графики за 24 ч ----
+const MSV = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const M_ICONS = {
+  temp:'<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>',
+  hum:'<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+  vpd:'<path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>',
+  co2:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  tvoc:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  weight:'<path d="M12 3v18M6 21h12M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z"/>',
+  water:'<path d="M5 3h14l-1.5 17a2 2 0 0 1-2 1.8h-7a2 2 0 0 1-2-1.8z"/><path d="M6 9h12"/>',
+  uv:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>',
+  door:'<path d="M13 4h3a2 2 0 0 1 2 2v14M2 20h3M13 20h9M10 12v.01M13 4.6v16.1a1 1 0 0 1-1.2 1L5 20V5.6a2 2 0 0 1 1.5-1.9l4-1A2 2 0 0 1 13 4.6z"/>',
+  dew:'<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><path d="M9 14h6"/>',
+  light:'<path d="M9 18h6M10 22h4M15.1 14c.2-1 .7-1.7 1.4-2.5A4.7 4.7 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.8 1.2 1.5 1.4 2.5"/>',
+  wifi:'<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>'
+};
+const M_SERIES = {temp:["t", "--heat"], hum:["h", "--water"], vpd:["vpd", "--green"], co2:["co2", "--muted"], tvoc:["tvoc", "--uv"],
+  weight:["w", "--green"], uv:["uv", "--uv"], dew:["dew", "--water"]};
+function sparkline(id){
+  const ser = M_SERIES[id], pts = S.history24 || [];
+  if(!ser || pts.length < 4 || !isDeviceOnline()) return "";
+  const get = p => ser[0] === "vpd" ? (p.t !== undefined && p.h !== undefined ? vpd(p.t, p.h) : undefined)
+    : ser[0] === "dew" ? (p.t !== undefined && p.h !== undefined ? dewPoint(p.t, p.h) : undefined) : p[ser[0]];
+  const step = Math.max(1, Math.floor(pts.length / 72)), vals = [];
+  for(let i = 0; i < pts.length; i += step){ const v = get(pts[i]); if(v !== undefined && v !== null && isFinite(v)) vals.push(+v); }
+  if(vals.length < 4) return "";
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if(hi - lo < 1e-6){ hi += 1; lo -= 1; }
+  const W = 200, H = 34, xs = i => (i / (vals.length - 1) * W).toFixed(1), ys = v => (H - 2 - (v - lo) / (hi - lo) * (H - 6)).toFixed(1);
+  const line = vals.map((v, i) => (i ? "L" : "M") + xs(i) + " " + ys(v)).join("");
+  const col = `var(${ser[1]})`, gid = "sg-" + id;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1">
+    <stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${line}L${W} ${H}L0 ${H}Z" fill="url(#${gid})"/><path d="${line}" fill="none" stroke="${col}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+    <circle cx="${xs(vals.length - 1)}" cy="${ys(vals[vals.length - 1])}" r="2.6" fill="${col}"/></svg>`;
+}
+function metricDecor(id, html){
+  const ic = M_ICONS[id] ? `<span class="m-ic m-${id}"><svg ${MSV}>${M_ICONS[id]}</svg></span>` : "";
+  html = html.replace('<div class="lbl">', '<div class="lbl">' + ic);
+  const sp = sparkline(id);
+  return sp ? html.replace(/<\/div>$/, sp + "</div>") : html;
+}
+
+// ---- тема ----
+const THEME_ICONS = {
+  auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>',
+  light:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>',
+  dark:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'
+};
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function themeMode(){ try { return localStorage.getItem("gb.theme") || "auto"; } catch(e){ return "auto"; } }
+function applyTheme(mode){
+  if(mode === "light" || mode === "dark") document.documentElement.dataset.theme = mode;
+  else delete document.documentElement.dataset.theme;
+  const b = $("btnTheme");
+  if(b){ b.innerHTML = `<svg ${MSV}>${THEME_ICONS[mode] || THEME_ICONS.auto}</svg>`;
+    b.title = tr(mode === "light" ? "Тема: светлая" : mode === "dark" ? "Тема: тёмная" : "Тема: как в системе"); }
+  applyChartTheme();
+}
+function applyChartTheme(){
+  if(typeof Chart === "undefined") return;
+  const mu = cssVar("--muted") || "#66716a", ln = cssVar("--line") || "#e7e9e7";
+  Chart.defaults.color = mu;
+  Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+  if(typeof CGRID !== "undefined") CGRID.color = ln;
+  Object.values(Chart.instances || {}).forEach(ch => {
+    Object.values(ch.options.scales || {}).forEach(sc => {
+      if(sc.grid && sc.grid.display !== false) sc.grid.color = ln;
+      if(sc.ticks) sc.ticks.color = mu;
+      if(sc.title) sc.title.color = mu;
+    });
+    if(ch.options.plugins?.legend?.labels) ch.options.plugins.legend.labels.color = mu;
+    ch.update("none");
+  });
+}
+$("btnTheme").onclick = () => {
+  const order = ["auto", "light", "dark"], next = order[(order.indexOf(themeMode()) + 1) % 3];
+  try { localStorage.setItem("gb.theme", next); } catch(e){}
+  applyTheme(next);
+};
+if(window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyChartTheme());
 
 // ---- вес ----
 function renderWeight(){
@@ -2526,7 +2818,8 @@ async function loadCharts(){
   $("chartInfo").textContent = data.length ? `Показано: ${fmtDateTime(from)} — ${fmtDateTime(to)} · точек: ${data.length}` : "За выбранный период данных нет";
 }
 const cpts = (data, k) => data.filter(p => p[k] !== undefined && p[k] !== null).map(p => ({x:p.ts, y:p[k]}));
-const CGRID = {color:"#eef1ee"};
+const CGRID = {color:cssVar("--line") || "#e7e9e7"};
+applyTheme(themeMode());
 const CHART_SPECS = {
   chClimate:data => ({datasets:[
     {label:"Температура, °C", data:cpts(data, "t"), borderColor:"#d9642f", yAxisID:"y"},
@@ -2867,7 +3160,7 @@ function stageEditorHtml(s, i, n){
     <div class="fields" style="margin-top:10px">
       <div><label class="f">Включение</label><input type="time" data-k="u.start" value="${esc(u.start)}"></div>
       <div><label class="f">Выключение</label><input type="time" data-k="u.end" value="${esc(u.end)}"></div>
-      <div><label class="f">Яркость, %</label><input type="number" min="0" max="100" data-k="u.brightness" value="${u.brightness}"></div>
+      <div style="display:none"><label class="f">Яркость, %</label><input type="number" min="0" max="100" data-k="u.brightness" value="${u.brightness}"></div>
     </div>
   </div>`;
 }
@@ -2984,13 +3277,18 @@ $("iconFile").onchange = async e => {
 /* ===================== МОДУЛИ ===================== */
 const modCards = {};
 function presetsUsing(type){ return allPresets().filter(p => p.modules?.[type]?.use).map(p => p.name); }
-const moduleEngaged = m => { if(m.info?.type === "water") return true; const prof = S.settings.moduleProfile?.[m.info?.type]; return prof ? !!prof.use : true; };
+const moduleEngaged = m => { if(m.info?.type === "water" || m.info?.type === "uv") return true; const prof = S.settings.moduleProfile?.[m.info?.type]; return prof ? !!prof.use : true; };
 function modAutoText(type){
   const c = effective().climate, prof = S.settings.moduleProfile?.[type];
   if(prof && !prof.use) return "Текущий пресет этот модуль не использует — в режиме «Авто» он выключен.";
   if(type === "humidifier"){ const pm = S.settings.watering?.humPrimeMl ?? 100;
     return `Авто: по сигналу бокса. Увлажняет при влажности ниже ${c.humMin ?? "?"}% до ${c.humMin !== undefined ? Math.round((c.humMin + c.humMax) / 2) : "?"}%.` +
       (pm > 0 ? ` Перед включением бокс подкачивает в бачок ${pm} мл воды через клапан увлажнителя.` : ""); }
+  if(type === "uv"){ const e = effective(), um = S.settings.uv?.mode || "auto";
+    return um === "on" ? "Авто: общий режим UV на странице — «всегда включена». При открытой двери бокс сразу выключает лампу."
+      : um === "off" ? "Авто: общий режим UV на странице — «выключена»."
+      : e.uv.enabled === false ? "Авто: по сигналу бокса. Сейчас тёмный этап — лампа не включается."
+      : `Авто: по сигналу бокса. Лампа горит с ${e.uv.start} до ${e.uv.end} по расписанию этапа. При открытой двери бокс сразу выключает лампу.`; }
   if(type === "water") return "Насос включается только по команде бокса: полив растений по расписанию или по весу и подкачка воды в увлажнитель. Куда идёт вода, выбирает реле клапанов на боксе.";
   if(type === "heater") return `Авто: по сигналу бокса. Греет при температуре ниже ${c.tempMin ?? "?"} °C до ${c.tempMin !== undefined ? ((c.tempMin + c.tempMax) / 2).toFixed(1) : "?"} °C.`;
   if(type === "fan") return `Авто: по сигналу бокса. Проветривает при T > ${c.tempMax ?? "?"} °C, влажности > ${c.humMax ?? "?"}% или CO₂ > ${c.co2Max ?? "?"} ppm` +
@@ -3033,8 +3331,10 @@ function modFormHtml(id, type){
       <div><label class="f">Проветривать каждые, мин</label><input type="number" name="everyMin" min="0"></div>
       <div><label class="f">На сколько, мин</label><input type="number" name="forMin" min="0"></div></div>
       <p class="small muted">Пороги и расписание здесь работают только при включённых «Своих порогах». В режиме «Авто» обдув следует сигналу бокса и расписанию пресета.</p>`;
-  } else spec = `<p class="small muted">Настройки этого типа модуля появятся в следующей версии страницы.</p>`;
-  const head = type === "water" ? `<div class="fields" style="grid-template-columns:1fr"><div><label class="f">Название</label><input type="text" name="name" maxlength="40"></div></div><p class="small muted" data-auto></p>` : common;
+  } else if(type !== "uv") spec = `<p class="small muted">Настройки этого типа модуля появятся в следующей версии страницы.</p>`;
+  const head = type === "water" ? `<div class="fields" style="grid-template-columns:1fr"><div><label class="f">Название</label><input type="text" name="name" maxlength="40"></div></div><p class="small muted" data-auto></p>`
+    : type === "uv" ? common.split('<label class="switch small">')[0] + `<p class="small muted">Расписание света задаётся в пресете и в «Управление» → «UV-лампа». Реле только включает и выключает лампу, яркость не меняется.</p>`
+    : common;
   return `<form class="mform" data-id="${esc(id)}">${head}${spec}
     <div class="row" style="margin-top:14px">
       <button type="submit" class="btn sm">Сохранить</button>
@@ -3056,6 +3356,7 @@ function fillModForm(form, m){
 }
 function readModForm(form, type){
   const g = n => form.elements[n], nv = n => g(n) ? +g(n).value : undefined;
+  if(type === "uv") return {name:g("name").value.trim() || "UV-лампа", mode:g("mode").value};
   if(type === "water") return {name:g("name").value.trim() || "Полив", tank:{volumeMl:Math.max(100, Math.round(nv("tankMl") || 5000)),
     reserveMl:Math.max(0, Math.round(nv("reserveMl") || 0)), minMl:Math.max(0, Math.round(nv("minMl") || 0)), threshold:Math.min(4000, Math.max(100, Math.round(nv("threshold") || 2000)))}};
   const out = {name:g("name").value.trim() || "Модуль", mode:g("mode").value, custom:{enabled:g("customEnabled").checked}};
@@ -3145,7 +3446,9 @@ function renderModulesLive(){
     on.className = "pill " + (onl ? "" : "bad"); on.textContent = onl ? "онлайн" : "офлайн";
     const chips = [];
     if(onl) chips.push(`<span class="pill ${st.on ? "" : "gray"}">${st.on ? "Работает" : "Выключен"}</span>`);
-    if(m.info?.type !== "water") chips.push(`<span class="pill ${eng ? "uv" : "gray"}">${eng ? "Задействован в пресете" : "Не используется пресетом"}</span>`);
+    if(onl && m.info?.type === "uv" && st.doorOpen) chips.push(`<span class="pill warn">Дверь открыта — лампа выключена</span>`);
+    if(onl && m.info?.type === "uv" && st.onMinutes !== undefined) chips.push(`<span class="pill gray">горела ${st.onMinutes} мин с запуска</span>`);
+    if(m.info?.type !== "water" && m.info?.type !== "uv") chips.push(`<span class="pill ${eng ? "uv" : "gray"}">${eng ? "Задействован в пресете" : "Не используется пресетом"}</span>`);
     if(onl && st.pump) chips.push(`<span class="pill info">Насос качает</span>`);
     if(onl && m.info?.type === "water"){
       chips.push(`<span class="pill ${st.empty ? "bad" : st.waterLow ? "warn" : "info"}">${st.empty ? "Бак пуст" : st.waterLow ? "Мало воды" : "Вода есть"} · ≈ ${st.remainMl ?? "?"} мл</span>`);
@@ -3679,6 +3982,8 @@ function renderDiag(){
     ["Модуль полива (ESP-NOW)", st(online ? !!wm.online : null, wm.online ? "на связи" : wm.seen ? "нет связи" : "не подключён"),
       wm.online ? `в баке ≈ ${wm.remainMl} мл${wm.empty ? ", бак пуст" : wm.low ? ", мало воды" : ""}, датчик ${wm.level}` : ""],
     ["Реле клапанов (GPIO13)", st(online ? true : null, t.valve === "humidifier" ? "клапан увлажнителя" : "клапан полива"), t.humPrime ? "идёт подкачка в увлажнитель" : t.pump2 ? "идёт полив" : ""],
+    ["Модуль UV (ESP-NOW)", st(online ? !!(t.uvModule || {}).online : null, (t.uvModule || {}).online ? ((t.uvModule || {}).on ? "лампа включена" : "лампа выключена") : (t.uvModule || {}).seen ? "нет связи" : "не подключён"),
+      t.uvSignal ? "бокс: свет нужен" : "бокс: свет не нужен"],
     ["Модули по ESP-NOW", st(online ? (t.espNow || 0) > 0 : null, online ? `${t.espNow || 0} на связи` : "—"), "связь без интернета"],
     ["Точное время", st(online ? t.timeValid !== false : null, t.timeValid === false ? "нет" : "получено"), ""],
     ["Wi-Fi", st(online ? t.rssi > -80 : null, online ? t.rssi + " дБм" : "—"), online ? (t.rssi > -60 ? "отличный сигнал" : t.rssi > -75 ? "нормальный" : "слабый") : ""],
@@ -3860,7 +4165,8 @@ function startDemo(){
     const uvOn = mode === "on" || (mode !== "off" && e.uv.enabled !== false && inWin(m, toMin(e.uv.start), toMin(e.uv.end)));
     const upd = {ts:Date.now(), t:jit(t.t, .2, 15, 32), h:jit(t.h, .6, 30, 95), co2:Math.round(jit(t.co2, 12, 400, 1500)),
       tvoc:Math.round(jit(t.tvoc, 4, 10, 400)), uptime:(t.uptime || 0) + 5, uvWanted:uvOn,
-      uv:uvOn && t.door === "closed" ? (e.uv.brightness ?? 100) : 0, nextWaterMin:nextWater(e.watering),
+      uv:uvOn && t.door === "closed" ? 100 : 0, uvSignal:uvOn && t.door === "closed",
+      uvModule:{online:true, seen:true, on:uvOn && t.door === "closed"}, nextWaterMin:nextWater(e.watering),
       grow:{active:!!e.grow, day:e.day, stage:e.stageIdx}};
     if(!t.pump2) upd.weight = +(t.weight - 0.007).toFixed(3);
     r("telemetry").update(upd);
@@ -3912,7 +4218,7 @@ function startDemo(){
     // модули в демо следуют профилю пресета
     const prof = (g("settings") || {}).moduleProfile || {};
     Object.entries(g("modules") || {}).forEach(([id, m]) => {
-      if(m.info?.type === "water") return;
+      if(m.info?.type === "water" || m.info?.type === "uv") return;
       const use = prof[m.info?.type] ? !!prof[m.info.type].use : true;
       if(m.state && m.state.profileUse !== use && m.state.reason !== "тест")
         r("modules/" + id + "/state").update({profileUse:use, on:use ? m.state.on : false, reason:use ? "в норме" : "не используется в текущем пресете"});
