@@ -638,7 +638,7 @@ table.cmp tbody tr:hover{background:var(--soft)}
               <div><label class="f" for="cPrimeMl">Перед включением, мл</label><input type="number" id="cPrimeMl" min="0" max="1000" step="10"></div>
               <div><label class="f" for="cPrimeGap">Не чаще раза в, мин</label><input type="number" id="cPrimeGap" min="0" max="240"></div>
             </div>
-            <p class="muted small">Перед каждым включением увлажнителя реле клапанов на боксе переключается на клапан увлажнителя, и насос модуля полива подаёт этот объём. 0 — не подкачивать.</p>
+            <p class="muted small">Вода в бачок увлажнителя идёт через клапан увлажнителя насосом модуля полива. Если в бачке стоит датчик воды, бокс доливает только когда датчик сухой и останавливает насос, как только вода дошла до датчика; этот объём — максимум за один раз, а интервал не используется. Без датчика бокс подаёт этот объём перед каждым включением увлажнителя. 0 — не подкачивать.</p>
             <button type="button" class="btn light sm" id="btnPrimeNow">Подкачать сейчас</button>
             <div class="sep"></div>
             <h3 style="font-size:14px">Калибровка насоса</h3>
@@ -1380,6 +1380,10 @@ const I18N_EN = {
   "Авто: по сигналу бокса. Сейчас тёмный этап — лампа не включается.":"Auto: by box signal. This is a dark stage — the lamp stays off.",
   "выключена вручную":"switched off manually","включена вручную":"switched on manually","дверь открыта - лампа выключена":"door open — lamp off",
   "сигнал бокса: свет по расписанию":"box signal: scheduled light","сигнал бокса: свет не нужен":"box signal: light not needed",
+  "Датчик воды в бачке":"Reservoir water sensor","Остановить, если сухо дольше, мин":"Stop if dry longer than, min",
+  "Датчик ставится на высоте, до которой нужно наливать воду. Датчик в воде — доливать не нужно. Датчик сухой — бокс доливает воду и останавливает насос, как только вода дошла до датчика. Если датчик остаётся сухим дольше указанного времени, увлажнитель останавливается, чтобы не работать без воды. Максимальный объём одной подкачки задаётся в «Управление» → «Полив».":"Mount the sensor at the level you want to fill to. Sensor wet — no refill needed. Sensor dry — the box refills and stops the pump as soon as the water reaches the sensor. If the sensor stays dry longer than the given time, the humidifier stops so it does not run dry. The maximum volume per refill is set in «Control» → «Watering».",
+  "Нет воды — увлажнитель остановлен":"No water — humidifier stopped","Вода в бачке есть":"Reservoir has water","Бачок доливается":"Refilling reservoir",
+  "Вода в бачок увлажнителя идёт через клапан увлажнителя насосом модуля полива. Если в бачке стоит датчик воды, бокс доливает только когда датчик сухой и останавливает насос, как только вода дошла до датчика; этот объём — максимум за один раз, а интервал не используется. Без датчика бокс подаёт этот объём перед каждым включением увлажнителя. 0 — не подкачивать.":"Water reaches the humidifier reservoir through the humidifier valve, pumped by the watering module. With a water sensor in the reservoir the box refills only when the sensor is dry and stops the pump as soon as the water reaches it; this volume is the maximum per refill and the interval is not used. Without a sensor the box delivers this volume before each humidifier start. 0 — no refill.",
   // диалоги
   "Загрузка…":"Loading…","Что получилось, что изменить в следующий раз":"What worked, what to change next time",
   "Да":"Yes","Удалить ":"Delete ",
@@ -1471,6 +1475,12 @@ const I18N_RX = [
   [/^Полив (сегодня|завтра|через (\d+) дн) в (\d\d:\d\d) · (.+) мл$/, (m, w, n, t, v) => `Watering ${w === "сегодня" ? "today" : w === "завтра" ? "tomorrow" : "in " + n + " d"} at ${t} · ${v} ml`],
   [/^Полив ([\d.]+) мл \((расписание|вручную|таймер|по весу)\)(?:, вес до полива (\d+) г)?$/, (m, v, s, w) => `Watered ${v} ml (${{"расписание":"scheduled","вручную":"manual","таймер":"timer","по весу":"by weight"}[s]})${w ? `, weight before ${w} g` : ""}`],
   [/^Подкачка в увлажнитель:? (\d+) мл$/, "Humidifier refill: $1 ml"],
+  [/^Подкачка в увлажнитель: около (\d+) мл, вода дошла до датчика$/, "Humidifier refill: about $1 ml, water reached the sensor"],
+  [/^Подкачка в увлажнитель: (\d+) мл, но датчик воды в бачке ещё сухой$/, "Humidifier refill: $1 ml, but the reservoir sensor is still dry"],
+  [/^«(.+)»: в бачке нет воды дольше (\d+) мин [-—] увлажнитель остановлен, проверьте бак полива и клапан$/, (m, n, k) => `«${trq(n)}»: no water in the reservoir for over ${k} min — humidifier stopped, check the watering tank and valve`],
+  [/^(.+) \(бачок доливается\)$/, (m, r) => `${trq(r)} (refilling reservoir)`],
+  [/^Авто: по сигналу бокса\. Увлажняет при влажности ниже (.+)% до (.+)%\. Когда датчик воды в бачке сухой, бокс доливает воду до датчика \(не больше (\d+) мл за раз\)\.$/,
+    (m, a, b, c) => `Auto: by box signal. Humidifies below ${a}% up to ${b}%. When the reservoir sensor is dry, the box refills up to the sensor (no more than ${c} ml at a time).`],
   [/^Подкачка в увлажнитель не выполнена: (.+)$/, (m, w) => `Humidifier refill failed: ${trq(w)}`],
   [/^Калибровка не выполнена: (.+)$/, (m, w) => `Calibration failed: ${trq(w)}`],
   [/^Полив пропущен \((.+)\): модуль полива не на связи$/, (m, s) => `Watering skipped (${trq(s)}): watering module offline`],
@@ -1886,8 +1896,8 @@ function buildDemoData(){
     waterModule:{online:true, seen:true, low:false, empty:false, pump:false, remainMl:3150, level:2870},
     pump2:false, pump2Ml:0, humPrime:false, humPriming:false, valve:"plants", espNow:4,
     door:"closed", doorWarn:false, led:0, uv:last.uv, uvWanted:last.uv > 0, uvSignal:last.uv > 0,
-    uvModule:{online:true, seen:true, on:last.uv > 0},
-    timeValid:true, nextWaterMin:120, uptime:6 * 86400 + 5 * 3600, rssi:-58, ip:"192.168.1.47", fw:"4.1", modulesOnline:5,
+    uvModule:{online:true, seen:true, on:last.uv > 0}, humTank:{sensor:true, wet:true, blocked:false, level:2650},
+    timeValid:true, nextWaterMin:120, uptime:6 * 86400 + 5 * 3600, rssi:-58, ip:"192.168.1.47", fw:"4.2", modulesOnline:5,
     grow:{active:true, day:5, stage:1}};
   const modules = {
     "water-5B9E20":{info:{type:"water", fw:"3.0", ip:"192.168.1.55", link:"espnow"},
@@ -1897,9 +1907,10 @@ function buildDemoData(){
     "uv-3A71C4":{info:{type:"uv", fw:"3.0", ip:"192.168.1.56", link:"espnow"},
       settings:{name:"UV-лампа", mode:"auto"},
       state:{on:true, boxSignal:true, doorOpen:false, onMinutes:312, reason:"сигнал бокса: свет по расписанию", link:"espnow", lastSeen:now, rssi:-63, dataFresh:true}},
-    "hum-A1B2C3":{info:{type:"humidifier", fw:"3.0", ip:"192.168.1.52", link:"espnow"},
-      settings:{name:"Увлажнитель", mode:"auto", custom:{enabled:false, low:55, high:65}, safety:{maxRunMin:30, restMin:5, maxHum:92}},
-      state:{on:false, reason:"сигнал бокса: влажность в норме", link:"espnow", lastSeen:now, rssi:-61, dataFresh:true, profileUse:true}},
+    "hum-A1B2C3":{info:{type:"humidifier", fw:"3.1", ip:"192.168.1.52", link:"espnow"},
+      settings:{name:"Увлажнитель", mode:"auto", custom:{enabled:false, low:55, high:65}, safety:{maxRunMin:30, restMin:5, maxHum:92}, tank:{threshold:2000, dryBlockMin:5}},
+      state:{on:false, reason:"сигнал бокса: влажность в норме", link:"espnow", lastSeen:now, rssi:-61, dataFresh:true, profileUse:true,
+             sensor:"analog", wet:true, level:2650, threshold:2000, waterLow:false}},
     "fan-4F2E91":{info:{type:"fan", fw:"3.0", ip:"192.168.1.53", link:"espnow"},
       settings:{name:"Обдув", mode:"auto", custom:{enabled:false, tempMax:28, humMax:75, co2Max:1200}, fan:{everyMin:60, forMin:5}},
       state:{on:true, reason:"сигнал бокса: проветривание по расписанию", boxSignal:true, link:"espnow", lastSeen:now, rssi:-66, dataFresh:true, profileUse:true}},
@@ -3283,7 +3294,8 @@ function modAutoText(type){
   if(prof && !prof.use) return "Текущий пресет этот модуль не использует — в режиме «Авто» он выключен.";
   if(type === "humidifier"){ const pm = S.settings.watering?.humPrimeMl ?? 100;
     return `Авто: по сигналу бокса. Увлажняет при влажности ниже ${c.humMin ?? "?"}% до ${c.humMin !== undefined ? Math.round((c.humMin + c.humMax) / 2) : "?"}%.` +
-      (pm > 0 ? ` Перед включением бокс подкачивает в бачок ${pm} мл воды через клапан увлажнителя.` : ""); }
+      (pm <= 0 ? "" : S.telemetry?.humTank?.sensor ? ` Когда датчик воды в бачке сухой, бокс доливает воду до датчика (не больше ${pm} мл за раз).`
+        : ` Перед включением бокс подкачивает в бачок ${pm} мл воды через клапан увлажнителя.`); }
   if(type === "uv"){ const e = effective(), um = S.settings.uv?.mode || "auto";
     return um === "on" ? "Авто: общий режим UV на странице — «всегда включена». При открытой двери бокс сразу выключает лампу."
       : um === "off" ? "Авто: общий режим UV на странице — «выключена»."
@@ -3313,7 +3325,12 @@ function modFormHtml(id, type){
       <div><label class="f">Пауза, мин</label><input type="number" name="restMin" min="0"></div>
       ${type === "heater" ? `<div><label class="f">Аварийный макс, °C</label><input type="number" step="0.5" name="maxTemp"></div>`
                           : `<div><label class="f">Аварийный макс, %</label><input type="number" name="maxHum"></div>`}</div>`;
-    if(type === "humidifier") spec += `<p class="small muted">Объём подкачки воды задаётся в «Управление» → «Полив».</p>`;
+    if(type === "humidifier") spec += `<div class="subhead">Датчик воды в бачке</div>
+      <div class="fields">
+        <div><label class="f">Порог датчика</label><input type="number" name="tankThreshold" min="100" max="4000"></div>
+        <div><label class="f">Остановить, если сухо дольше, мин</label><input type="number" name="dryBlockMin" min="0" max="120"></div>
+      </div>
+      <p class="small muted">Датчик ставится на высоте, до которой нужно наливать воду. Датчик в воде — доливать не нужно. Датчик сухой — бокс доливает воду и останавливает насос, как только вода дошла до датчика. Если датчик остаётся сухим дольше указанного времени, увлажнитель останавливается, чтобы не работать без воды. Максимальный объём одной подкачки задаётся в «Управление» → «Полив».</p>`;
   } else if(type === "water"){
     spec = `<div class="subhead">Бак</div>
       <div class="fields">
@@ -3351,6 +3368,7 @@ function fillModForm(form, m){
   set("tempMax", c.tempMax); set("humMax", c.humMax); set("co2Max", c.co2Max);
   set("everyMin", f.everyMin); set("forMin", f.forMin);
   set("maxHum", sf.maxHum);
+  if(m.info?.type === "humidifier"){ const ht = s.tank || {}; set("tankThreshold", ht.threshold ?? 2000); set("dryBlockMin", ht.dryBlockMin ?? 5); }
   const tk = s.tank || {};
   set("tankMl", tk.volumeMl ?? 5000); set("reserveMl", tk.reserveMl ?? 500); set("minMl", tk.minMl ?? 100); set("threshold", tk.threshold ?? 2000);
 }
@@ -3364,7 +3382,10 @@ function readModForm(form, type){
     out.custom.low = nv("low"); out.custom.high = nv("high");
     out.safety = {maxRunMin:Math.max(0, Math.round(nv("maxRunMin"))), restMin:Math.max(0, Math.round(nv("restMin")))};
     if(type === "heater") out.safety.maxTemp = nv("maxTemp");
-    if(type === "humidifier") out.safety.maxHum = Math.min(99, Math.max(60, nv("maxHum") || 92));
+    if(type === "humidifier"){
+      out.safety.maxHum = Math.min(99, Math.max(60, nv("maxHum") || 92));
+      out.tank = {threshold:Math.min(4000, Math.max(100, Math.round(nv("tankThreshold") || 2000))), dryBlockMin:Math.min(120, Math.max(0, Math.round(nv("dryBlockMin") ?? 5)))};
+    }
   } else if(type === "fan"){
     out.custom.tempMax = nv("tempMax"); out.custom.humMax = nv("humMax"); out.custom.co2Max = nv("co2Max");
     out.fan = {everyMin:Math.max(0, Math.round(nv("everyMin"))), forMin:Math.max(0, Math.round(nv("forMin")))};
@@ -3453,6 +3474,9 @@ function renderModulesLive(){
     if(onl && m.info?.type === "water"){
       chips.push(`<span class="pill ${st.empty ? "bad" : st.waterLow ? "warn" : "info"}">${st.empty ? "Бак пуст" : st.waterLow ? "Мало воды" : "Вода есть"} · ≈ ${st.remainMl ?? "?"} мл</span>`);
       chips.push(`<span class="pill gray">датчик ${st.level ?? "?"} / порог ${st.threshold ?? "?"}</span>`);
+    } else if(onl && m.info?.type === "humidifier" && st.sensor && st.sensor !== "none"){
+      chips.push(`<span class="pill ${st.waterLow ? "bad" : st.wet ? "info" : "warn"}">${st.waterLow ? "Нет воды — увлажнитель остановлен" : st.wet ? "Вода в бачке есть" : "Бачок доливается"}</span>`);
+      if(st.sensor === "analog") chips.push(`<span class="pill gray">датчик ${st.level ?? "?"} / порог ${st.threshold ?? "?"}</span>`);
     } else if(onl && st.waterLow) chips.push(`<span class="pill warn">Нет воды в бачке увлажнителя</span>`);
     if(onl && st.link) chips.push(`<span class="pill ${st.link === "espnow" ? "" : "warn"}">${st.link === "espnow" ? "Связь с боксом: ESP-NOW" : "Связь с боксом: через облако"}</span>`);
     if(onl && st.boxSignal) chips.push(`<span class="pill">Сигнал бокса: вкл</span>`);
